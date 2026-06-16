@@ -1,0 +1,174 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{uid} {
+      allow read:  if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow update: if request.auth != null && request.auth.uid == uid
+          && request.resource.data.role == 'admin'
+          && request.resource.data.appOrigin == 'admin';
+      allow update: if request.auth != null && request.auth.uid == uid
+          && !request.resource.data.diff(resource.data)
+              .affectedKeys().hasAny(['role', 'appOrigin']);
+      allow update: if _isAdmin();
+      allow delete: if _isAdmin();
+      match /notifications/{id} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+      match /delivery_history/{id} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if request.auth != null;
+      }
+      match /monthly_earnings/{id} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if request.auth != null;
+      }
+      match /savedAddresses/{addrId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+      match /recentAddresses/{addrId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    match /orders/{orderId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null && (
+        resource.data.clientUid  == request.auth.uid ||
+        resource.data.deliveryId == request.auth.uid ||
+        _isDriver() ||
+        _isRestaurantOwner(resource.data.restaurantId) ||
+        _isAdmin()
+      );
+      allow update: if request.auth != null && (
+        resource.data.clientUid  == request.auth.uid ||
+        resource.data.deliveryId == request.auth.uid ||
+        _isDriver() ||
+        _isRestaurantOwner(resource.data.restaurantId) ||
+        _isAdmin()
+      );
+      match /messages/{msgId} {
+        allow read, create: if request.auth != null;
+      }
+    }
+
+    match /restaurants/{restId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (
+        resource.data.ownerUid == request.auth.uid ||
+        _isAdmin() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating'])
+      );
+      allow delete: if _isAdmin();
+
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow create: if request.auth != null
+            && request.resource.data.clientUid == request.auth.uid;
+        allow update, delete: if request.auth != null
+            && (resource.data.clientUid == request.auth.uid || _isAdmin());
+      }
+
+      // Promos restaurant — un client ne peut utiliser le même code qu'une seule fois
+      match /promos/{promoId} {
+        allow read: if request.auth != null;
+
+        allow create: if request.auth != null
+            && (_isAdmin() || _isRestaurantOwner(restId))
+            && request.resource.data.usedCount == 0;
+
+        allow delete: if request.auth != null
+            && (_isAdmin() || _isRestaurantOwner(restId));
+
+        allow update: if request.auth != null
+            && (_isAdmin() || _isRestaurantOwner(restId));
+
+        // Client : incrémenter usedCount de +1 et s'ajouter à usedBy (usage unique)
+        allow update: if request.auth != null
+            && request.resource.data.diff(resource.data)
+                   .affectedKeys().hasOnly(['usedCount', 'usedBy'])
+            && request.resource.data.usedCount == resource.data.usedCount + 1
+            && !(request.auth.uid in resource.data.usedBy)
+            && request.resource.data.usedBy.hasAll(resource.data.usedBy)
+            && request.resource.data.usedBy.size() == resource.data.usedBy.size() + 1;
+      }
+    }
+
+    match /{path=**}/reviews/{reviewId} {
+      allow read, write: if _isAdmin();
+    }
+
+    match /ratings/{ratingId} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null
+          && request.resource.data.clientUid == request.auth.uid;
+    }
+
+    match /categories/{id}    { allow read: if true; allow write: if _isAdmin(); }
+    match /cuisine_types/{id} { allow read: if true; allow write: if _isAdmin(); }
+    match /advertisements/{id}{ allow read: if true; allow write: if _isAdmin(); }
+
+    match /promos/{promoId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && (
+        _isAdmin() || _isRestaurantOwner(resource.data.restaurantId)
+      );
+    }
+
+    // Codes promo globaux admin — un client ne peut utiliser le même code qu'une seule fois
+    match /promo_codes/{docId} {
+      allow read: if request.auth != null;
+      allow create, delete: if _isAdmin();
+      allow update: if _isAdmin();
+
+      // Client : incrémenter usedCount de +1 et s'ajouter à usedBy (usage unique)
+      allow update: if request.auth != null
+          && request.resource.data.diff(resource.data)
+                 .affectedKeys().hasOnly(['usedCount', 'usedBy'])
+          && request.resource.data.usedCount == resource.data.usedCount + 1
+          && !(request.auth.uid in resource.data.usedBy)
+          && request.resource.data.usedBy.hasAll(resource.data.usedBy)
+          && request.resource.data.usedBy.size() == resource.data.usedBy.size() + 1;
+    }
+
+    match /drivers/{driverId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+          && (request.auth.uid == driverId || _isAdmin());
+    }
+
+    match /wallets/{walletId} {
+      allow read: if request.auth != null && request.auth.uid == walletId;
+      allow write: if _isAdmin();
+    }
+
+    match /admin/{docId}           { allow read, write: if _isAdmin(); }
+    match /payout_logs/{id}        { allow read: if _isAdmin(); allow write: if request.auth != null; }
+    match /wallet_transactions/{id}{ allow read, write: if request.auth != null; }
+    match /alerts/{alertId}        { allow create: if request.auth != null; allow read, update: if request.auth != null; }
+    match /support_tickets/{id}    { allow create: if request.auth != null; allow read: if request.auth != null && (resource.data.uid == request.auth.uid || _isAdmin()); allow update: if _isAdmin(); }
+    match /payment_logs/{id}       { allow read: if _isAdmin(); allow write: if request.auth != null; }
+    match /config/{docId}          { allow read: if true; allow write: if _isAdmin(); }
+    match /reports/{id}            { allow read: if _isAdmin(); allow write: if request.auth != null; }
+    match /audit_logs/{id}         { allow read: if _isAdmin(); allow write: if request.auth != null; }
+
+    function _isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role.lower() == 'admin';
+    }
+    function _isDriver() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'driver';
+    }
+    function _isRestaurantOwner(restaurantId) {
+      return restaurantId != null
+        && exists(/databases/$(database)/documents/restaurants/$(restaurantId))
+        && get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.ownerUid == request.auth.uid;
+    }
+  }
+}

@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<!-- ══════════════════════════════════════════
+         IDENTITÉ DE L'APPLICATION
+    ══════════════════════════════════════════ -->
+		<key>CFBundleDevelopmentRegion</key>
+		<string>$(DEVELOPMENT_LANGUAGE)</string>
+		<key>CFBundleDisplayName</key>
+		<string>allofoods</string>
+		<key>CFBundleExecutable</key>
+		<string>$(EXECUTABLE_NAME)</string>
+		<key>CFBundleIdentifier</key>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+		<key>CFBundleInfoDictionaryVersion</key>
+		<string>6.0</string>
+		<key>CFBundleName</key>
+		<string>allofoods</string>
+		<key>CFBundlePackageType</key>
+		<string>APPL</string>
+		<key>CFBundleShortVersionString</key>
+		<string>$(FLUTTER_BUILD_NAME)</string>
+		<key>CFBundleSignature</key>
+		<string>????</string>
+		<key>CFBundleVersion</key>
+		<string>$(FLUTTER_BUILD_NUMBER)</string>
+		<!-- ══════════════════════════════════════════
+         COMPATIBILITÉ iOS — TOUTES VERSIONS
+         Minimum iOS 12.0 (couvre iPhone 5s et +)
+    ══════════════════════════════════════════ -->
+		<key>LSRequiresIPhoneOS</key>
+		<true/>
+		<key>MinimumOSVersion</key>
+		<string>12.0</string>
+		<!-- ══════════════════════════════════════════
+         PERMISSIONS — LOCALISATION GPS
+         Obligatoire pour geolocator + Google Maps
+    ══════════════════════════════════════════ -->
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>allofoods utilise votre position pour calculer les frais de livraison et afficher votre adresse sur la carte.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>allofoods utilise votre position en arrière-plan pour suivre votre livraison en temps réel.</string>
+		<key>NSLocationAlwaysUsageDescription</key>
+		<string>allofoods utilise votre position pour le suivi de livraison.</string>
+		<!-- ══════════════════════════════════════════
+         PERMISSIONS — CAMÉRA & GALERIE
+         Obligatoire pour image_picker (photo profil)
+    ══════════════════════════════════════════ -->
+		<key>NSCameraUsageDescription</key>
+		<string>allofoods utilise votre appareil photo pour prendre votre photo de profil.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>allofoods accède à votre galerie pour choisir votre photo de profil.</string>
+		<key>NSPhotoLibraryAddUsageDescription</key>
+		<string>allofoods peut enregistrer des photos dans votre galerie.</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>allofoods utilise le microphone pour les fonctionnalités vidéo.</string>
+		<!-- ══════════════════════════════════════════
+         PERMISSIONS — RÉSEAU
+         Obligatoire pour Google Maps + KKiaPay
+    ══════════════════════════════════════════ -->
+		<key>NSAppTransportSecurity</key>
+		<dict>
+			<!-- Autorise les requêtes HTTP et HTTPS -->
+			<key>NSAllowsArbitraryLoads</key>
+			<true/>
+			<!-- Domaines spécifiques nécessaires -->
+			<key>NSExceptionDomains</key>
+			<dict>
+				<key>kkiapay.me</key>
+				<dict>
+					<key>NSExceptionAllowsInsecureHTTPLoads</key>
+					<false/>
+					<key>NSIncludesSubdomains</key>
+					<true/>
+				</dict>
+				<key>maps.googleapis.com</key>
+				<dict>
+					<key>NSExceptionAllowsInsecureHTTPLoads</key>
+					<false/>
+					<key>NSIncludesSubdomains</key>
+					<true/>
+				</dict>
+			</dict>
+		</dict>
+		<!-- ══════════════════════════════════════════
+         GOOGLE MAPS iOS
+         Remplace TA_CLE_GOOGLE_MAPS_ICI
+    ══════════════════════════════════════════ -->
+		<key>GMSApiKey</key>
+		<string>TA_CLE_GOOGLE_MAPS_ICI</string>
+		<!-- ══════════════════════════════════════════
+         INTERFACE & ORIENTATION
+    ══════════════════════════════════════════ -->
+		<key>UILaunchStoryboardName</key>
+		<string>LaunchScreen</string>
+		<key>UIMainStoryboardFile</key>
+		<string>Main</string>
+		<!-- Orientations iPhone -->
+		<key>UISupportedInterfaceOrientations</key>
+		<array>
+			<string>UIInterfaceOrientationPortrait</string>
+			<string>UIInterfaceOrientationLandscapeLeft</string>
+			<string>UIInterfaceOrientationLandscapeRight</string>
+		</array>
+		<!-- Orientations iPad -->
+		<key>UISupportedInterfaceOrientations~ipad</key>
+		<array>
+			<string>UIInterfaceOrientationPortrait</string>
+			<string>UIInterfaceOrientationPortraitUpsideDown</string>
+			<string>UIInterfaceOrientationLandscapeLeft</string>
+			<string>UIInterfaceOrientationLandscapeRight</string>
+		</array>
+		<!-- ══════════════════════════════════════════
+         PERFORMANCES & AFFICHAGE
+    ══════════════════════════════════════════ -->
+		<!-- ProMotion 120Hz sur iPhone 13 Pro et + -->
+		<key>CADisableMinimumFrameDurationOnPhone</key>
+		<true/>
+		<!-- Support trackpad/souris iPadOS -->
+		<key>UIApplicationSupportsIndirectInputEvents</key>
+		<true/>
+		<!-- Barre de statut cachée au lancement -->
+		<key>UIStatusBarHidden</key>
+		<true/>
+		<key>UIViewControllerBasedStatusBarAppearance</key>
+		<false/>
+		<!-- Support du mode sombre -->
+		<key>UIUserInterfaceStyle</key>
+		<string>Automatic</string>
+		<!-- Empêche l'app de se mettre en pause en arrière-plan (suivi GPS) -->
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>location</string>
+			<string>fetch</string>
+		</array>
+		<!-- ══════════════════════════════════════════
+         FLUTTER
+    ══════════════════════════════════════════ -->
+		<key>CADisableMinimumFrameDurationOnPhone</key>
+		<true/>
+	</dict>
+</plist>

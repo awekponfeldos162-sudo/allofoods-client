@@ -1,0 +1,45 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "allofoods-5d32b",
+          "appId": "1:59066656363:android:92d40e39ce61bc199fb32e",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "allofoods-5d32b",
+          "configurations": {
+            "android": "1:59066656363:android:92d40e39ce61bc199fb32e",
+            "ios": "1:59066656363:ios:422cd9d804d3dc5c9fb32e",
+            "macos": "1:59066656363:ios:422cd9d804d3dc5c9fb32e",
+            "web": "1:59066656363:web:0a4275130086ef239fb32e",
+            "windows": "1:59066656363:web:061cf3bf495159a49fb32e"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
+  "firestore": {
+    "database": "(default)",
+    "location": "europe-west1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

@@ -1,0 +1,90 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Firebase Functions — node_modules inutile dans git
+functions/node_modules/
+
+# Secrets & environment variables — NE JAMAIS COMMITTER
+.env
+.env.*
+*.env
+!.env.example
+
+# Clé de signature Android — contient les mots de passe
+android/key.properties
+*.jks
+*.keystore
+
+# Firebase config — contient les clés du projet
+google-services.json
+GoogleService-Info.plist
+lib/firebase_options.dart
+
+# Node.js à la racine + windows ephemeral (auto-généré)
+/node_modules/
+windows/flutter/ephemeral/
+
+# Scripts locaux — données personnelles, ne pas pousser sur dépôt public
+generate_cv.dart
+tools/generate_cv.dart
+CV_*.pdf
+
+# Fichier personnel de notes � cl�s et fingerprints locaux
+placenew
+placenew.*
+
+# Claude Code — données locales
+.claude/
+.agents/
+skills-lock.json
+
+# Archives binaires locales — pas utiles dans git
+assets.zip
+lib.zip
+
+# Empreintes keystore Android (données personnelles)
+enpreinte
+enpreinte.*
