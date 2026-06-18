@@ -17,14 +17,10 @@ import '../models/cart_model.dart';
 import '../models/delivery_model.dart'
     show DeliveryCalculator, DeliveryLocation, DeliveryProvider, LatLngPoint;
 import 'RecapPage.dart';
+import '../services/adresse_search_service.dart';
 
 // Centre de Cotonou — utilisé comme origine et biais de localisation
 const LatLng _cotonou = LatLng(6.3654, 2.4183);
-
-// ─── Places API (New) — endpoints ────────────────────────────────────────────
-const String _kAutocompleteUrl =
-    'https://places.googleapis.com/v1/places:autocomplete';
-const String _kPlaceDetailsBase = '/v1/places';
 
 class AdressePage extends StatefulWidget {
   final int? totalAmount;
@@ -65,7 +61,7 @@ class _AdressePageState extends State<AdressePage> {
 
   // Autocomplete
   Timer? _debounce;
-  List<Map<String, dynamic>> _results = [];
+  List<LieuSuggestion> _results = [];
   bool _showResults = false;
 
   // Jeton de session Places API (New) — regroupe autocomplete + place details
@@ -176,7 +172,7 @@ class _AdressePageState extends State<AdressePage> {
                 (results.first as Map<String, dynamic>)['formatted_address']
                     as String?;
             if (formatted != null && formatted.isNotEmpty) {
-              setState(() => _address = formatted);
+              setState(() => _address = _stripBenin(formatted));
               return;
             }
           }
@@ -209,7 +205,13 @@ class _AdressePageState extends State<AdressePage> {
   String _coordFallback(LatLng pos) =>
       '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
 
-  // ─── Places Autocomplete (New) + fallback Nominatim ──────────────────────
+  // Supprime ", Bénin" / ", Benin" en fin d'adresse pour un affichage plus propre
+  String _stripBenin(String s) => s
+      .replaceAll(RegExp(r',?\s*Bénin\s*$'), '')
+      .replaceAll(RegExp(r',?\s*Benin\s*$'), '')
+      .trim();
+
+  // ─── Recherche de lieux — délègue à AdresseSearchService ────────────────
 
   void _onSearchChanged(String val) {
     _debounce?.cancel();
@@ -221,400 +223,58 @@ class _AdressePageState extends State<AdressePage> {
       return;
     }
     _debounce = Timer(
-        const Duration(milliseconds: 400), () => _fetchPredictions(val.trim()));
+        const Duration(milliseconds: 300), () => _fetchPredictions(val.trim()));
   }
 
   Future<void> _fetchPredictions(String query) async {
     if (!mounted) return;
     setState(() => _searching = true);
+    _sessionToken ??= _newSessionToken();
     try {
-      // 1) Places API (New) — Autocomplete (meilleur pour les POI nommés)
-      final placed = await _tryPlacesApiNew(query);
-      if (placed || !mounted) return;
-      // 2) Google Geocoding — fallback avec clé, bien meilleur que Nominatim pour Bénin
-      final geocoded = await _tryGoogleGeocoding(query);
-      if (geocoded || !mounted) return;
-      // 3) Nominatim (OpenStreetMap) — dernier recours, sans clé
-      await _tryNominatim(query);
+      final suggestions = await AdresseSearchService.rechercher(
+        query: query,
+        googleMapsKey: Env.googleMapsKey,
+        sessionToken: _sessionToken,
+      );
+      if (!mounted) return;
+      if (suggestions.isNotEmpty) {
+        setState(() {
+          _results = suggestions;
+          _showResults = true;
+        });
+      }
     } finally {
       if (mounted) setState(() => _searching = false);
     }
   }
 
-  // Places API (New) — POST https://places.googleapis.com/v1/places:autocomplete
-  // Selon documentation : https://developers.google.com/maps/documentation/places/android-sdk/autocomplete
-  Future<bool> _tryPlacesApiNew(String query) async {
-    final key = Env.googleMapsKey;
-    if (key.isEmpty || key.contains('REMPLACER')) return false;
+  // ─── Sélection d'un résultat ─────────────────────────────────────────────
 
-    // Initialiser le jeton de session au début de chaque nouvelle session
-    _sessionToken ??= _newSessionToken();
-
-    try {
-      // Obtenir la position du restaurant pour l'origine (distance à vol d'oiseau)
-      double? originLat;
-      double? originLng;
-      try {
-        final rp = context.read<DeliveryProvider>().restaurantPos;
-        originLat = rp.lat;
-        originLng = rp.lng;
-      } catch (_) {}
-
-      final body = <String, dynamic>{
-        'input': query,
-        // Jeton de session — regroupe toutes les requêtes auto + le Place Details
-        // suivant en une session de facturation unique
-        'sessionToken': _sessionToken,
-        'languageCode': 'fr',
-        // Restreindre aux résultats du Bénin uniquement
-        'includedRegionCodes': ['bj'],
-        // Biais géographique : cercle autour de Cotonou 80 km
-        // (résultats hors cercle possibles mais pénalisés)
-        'locationBias': {
-          'circle': {
-            'center': {
-              'latitude': _cotonou.latitude,
-              'longitude': _cotonou.longitude,
-            },
-            'radius': 80000.0,
-          },
-        },
-        // Origine = restaurant : permet d'obtenir distanceMeters dans la réponse
-        if (originLat != null && originLng != null)
-          'origin': {
-            'latitude': originLat,
-            'longitude': originLng,
-          },
-      };
-
-      final resp = await http
-          .post(
-            Uri.parse(_kAutocompleteUrl),
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Goog-Api-Key': key,
-            },
-            body: jsonEncode(body),
-          )
-          .timeout(const Duration(seconds: 6));
-
-      if (!mounted) return false;
-      debugPrint('[Places New] status=${resp.statusCode}');
-
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body) as Map<String, dynamic>;
-        final suggestions = data['suggestions'] as List<dynamic>? ?? [];
-
-        final preds = suggestions
-            .whereType<Map<String, dynamic>>()
-            .where((s) => s.containsKey('placePrediction'))
-            .map((s) {
-              final p = s['placePrediction'] as Map<String, dynamic>;
-
-              // Texte principal (nom du lieu) et secondaire (adresse)
-              final structured =
-                  p['structuredFormat'] as Map<String, dynamic>? ?? {};
-              final mainText =
-                  (structured['mainText'] as Map<String, dynamic>?)?['text']
-                      as String? ??
-                  '';
-              final secondaryText =
-                  (structured['secondaryText'] as Map<String, dynamic>?)?[
-                          'text'] as String? ??
-                      '';
-              // Texte complet comme fallback
-              final fullText =
-                  (p['text'] as Map<String, dynamic>?)?['text'] as String? ?? '';
-
-              // Distance depuis l'origine (restaurant) en km
-              final distMeters = p['distanceMeters'] as int?;
-
-              return {
-                'place_id': p['placeId'] as String? ?? '',
-                'description': fullText.isNotEmpty
-                    ? fullText
-                    : [mainText, secondaryText]
-                        .where((t) => t.isNotEmpty)
-                        .join(', '),
-                'mainText': mainText,
-                'secondaryText': secondaryText,
-                'distanceKm': distMeters != null ? distMeters / 1000.0 : null,
-                'lat': null,
-                'lng': null,
-              };
-            })
-            .where((p) => (p['place_id'] as String).isNotEmpty)
-            .toList();
-
-        if (preds.isNotEmpty && mounted) {
-          setState(() {
-            _results = preds;
-            _showResults = true;
-          });
-          return true;
-        }
-      } else {
-        debugPrint('[Places New] error body: ${resp.body}');
-      }
-    } catch (e) {
-      debugPrint('[Places New] exception: $e');
-    }
-    return false;
-  }
-
-  // Fallback Nominatim (OpenStreetMap) — sans API key, limité à Bénin
-  Future<void> _tryNominatim(String query) async {
-    try {
-      final uri = Uri.parse(
-        'https://nominatim.openstreetmap.org/search'
-        '?q=${Uri.encodeQueryComponent(query)}'
-        '&format=json&countrycodes=bj&limit=8&addressdetails=1&namedetails=1',
-      );
-      final resp = await http.get(uri, headers: {
-        'User-Agent': 'allofoods-flutter/1.0',
-        'Accept-Language': 'fr',
-      }).timeout(const Duration(seconds: 8));
-      if (!mounted) return;
-      if (resp.statusCode == 200) {
-        final list = jsonDecode(resp.body) as List<dynamic>;
-        final preds = list
-            .whereType<Map<String, dynamic>>()
-            .map((item) {
-              final label = _nominatimLabel(item);
-              // Nom du lieu depuis item['name'] (ex: "Marché Dantokpa")
-              // Fallback : première partie du label construit
-              final placeName = ((item['name'] as String?)?.trim() ?? '').isNotEmpty
-                  ? (item['name'] as String).trim()
-                  : label.split(',').first.trim();
-              return {
-                'place_id': '',
-                'description': label,
-                'mainText': placeName,
-                'secondaryText': label.contains(',')
-                    ? label.split(',').skip(1).join(',').trim()
-                    : '',
-                'distanceKm': null,
-                'lat': double.tryParse(item['lat'] as String? ?? ''),
-                'lng': double.tryParse(item['lon'] as String? ?? ''),
-              };
-            })
-            .where((p) =>
-                (p['description'] as String).isNotEmpty && p['lat'] != null)
-            .toList();
-        if (preds.isNotEmpty) {
-          setState(() {
-            _results = preds;
-            _showResults = true;
-          });
-        }
-      }
-    } catch (_) {}
-  }
-
-  // Google Geocoding API — fallback avec clé, bien meilleur que Nominatim pour les POI
-  Future<bool> _tryGoogleGeocoding(String query) async {
-    final key = Env.googleMapsKey;
-    if (key.isEmpty || key.contains('REMPLACER')) return false;
-    try {
-      final uri = Uri.parse(
-        'https://maps.googleapis.com/maps/api/geocode/json'
-        '?address=${Uri.encodeQueryComponent("$query, Bénin")}'
-        '&region=bj&language=fr&key=$key',
-      );
-      final resp = await http.get(uri).timeout(const Duration(seconds: 6));
-      if (!mounted) return false;
-      debugPrint('[Geocoding] status=${resp.statusCode}');
-      if (resp.statusCode != 200) return false;
-      final data = jsonDecode(resp.body) as Map<String, dynamic>;
-      if (data['status'] != 'OK') return false;
-      final results = data['results'] as List<dynamic>? ?? [];
-      final preds = results
-          .whereType<Map<String, dynamic>>()
-          .take(5)
-          .map((r) {
-            final geometry = r['geometry'] as Map<String, dynamic>?;
-            final location = geometry?['location'] as Map<String, dynamic>?;
-            final formatted = r['formatted_address'] as String? ?? '';
-            final components = r['address_components'] as List<dynamic>? ?? [];
-
-            // Chercher le vrai nom du lieu dans les composants
-            final placeName = _geocodingPlaceName(components, formatted);
-
-            // Sous-titre = tout sauf le nom du lieu (sans "Bénin" en fin)
-            final allParts = formatted.split(',').map((s) => s.trim()).toList();
-            final subtitle = allParts
-                .where((p) => p != placeName && p != 'Bénin' && p.isNotEmpty)
-                .take(2)
-                .join(', ');
-
-            return {
-              'place_id': '',
-              'description': formatted,
-              'mainText': placeName,
-              'secondaryText': subtitle,
-              'distanceKm': null,
-              'lat': (location?['lat'] as num?)?.toDouble(),
-              'lng': (location?['lng'] as num?)?.toDouble(),
-            };
-          })
-          .where((p) => p['lat'] != null && (p['description'] as String).isNotEmpty)
-          .toList();
-      if (preds.isNotEmpty && mounted) {
-        setState(() {
-          _results = preds;
-          _showResults = true;
-        });
-        return true;
-      }
-    } catch (e) {
-      debugPrint('[Geocoding] exception: $e');
-    }
-    return false;
-  }
-
-  // Extrait le nom du lieu depuis address_components :
-  // priorité → establishment/POI → premise → route (sans numéro) → 1ère partie non numérique
-  String _geocodingPlaceName(List<dynamic> components, String formatted) {
-    final comps = components.whereType<Map<String, dynamic>>();
-
-    // 1) Nom du lieu (enseigne, bâtiment, POI)
-    for (final c in comps) {
-      final types = (c['types'] as List<dynamic>? ?? []);
-      if (types.contains('establishment') ||
-          types.contains('point_of_interest') ||
-          types.contains('premise') ||
-          types.contains('natural_feature') ||
-          types.contains('park') ||
-          types.contains('airport')) {
-        final n = (c['long_name'] as String?)?.trim() ?? '';
-        if (n.isNotEmpty) return n;
-      }
-    }
-
-    // 2) Rue (sans numéro de rue)
-    for (final c in comps) {
-      final types = (c['types'] as List<dynamic>? ?? []);
-      if (types.contains('route')) {
-        final n = (c['long_name'] as String?)?.trim() ?? '';
-        if (n.isNotEmpty) return n;
-      }
-    }
-
-    // 3) Première partie non purement numérique de formatted_address
-    for (final part in formatted.split(',')) {
-      final p = part.trim();
-      if (p.isNotEmpty && !RegExp(r'^\d+$').hasMatch(p)) return p;
-    }
-
-    return formatted.split(',').first.trim();
-  }
-
-  String _nominatimLabel(Map<String, dynamic> item) {
-    // item['name'] = nom du lieu (enseigne, bâtiment, POI) — priorité absolue
-    final name = (item['name'] as String?)?.trim() ?? '';
-    final addr = item['address'] as Map<String, dynamic>? ?? {};
-
-    // Si pas de nom propre, on prend la rue ; sinon on la laisse en sous-titre
-    final primary = name.isNotEmpty
-        ? name
-        : (addr['road'] as String?)?.trim() ?? '';
-
-    final suburb = (addr['suburb'] as String?)?.trim() ?? '';
-    final city = ((addr['city'] as String?)?.trim() ?? '').isNotEmpty
-        ? (addr['city'] as String).trim()
-        : (addr['town'] as String?)?.trim() ?? '';
-
-    final parts = <String>[
-      if (primary.isNotEmpty) primary,
-      if (suburb.isNotEmpty && suburb != primary) suburb,
-      if (city.isNotEmpty && city != primary) city,
-    ];
-    if (parts.isEmpty) {
-      return (item['display_name'] as String? ?? '').split(',').take(3).join(', ');
-    }
-    return parts.join(', ');
-  }
-
-  // ─── Sélection d'un résultat ──────────────────────────────────────────────
-
-  Future<void> _selectResult(Map<String, dynamic> result) async {
-    final placeId = result['place_id'] as String? ?? '';
-    final description = result['description'] as String? ?? '';
-    final mainText = result['mainText'] as String? ?? '';
-    final directLat = result['lat'] as double?;
-    final directLng = result['lng'] as double?;
-
-    // Afficher le nom court du lieu dans le champ de recherche
+  Future<void> _selectResult(LieuSuggestion result) async {
     setState(() {
       _showResults = false;
-      _searchCtrl.text = mainText.isNotEmpty ? mainText : description;
+      _searchCtrl.text = result.titre;
     });
-
-    // Résultat Nominatim : coordonnées déjà disponibles
-    if (directLat != null && directLng != null) {
-      final ll = LatLng(directLat, directLng);
-      setState(() {
-        _address = description;
-        _marker = ll;
-      });
-      _recalc(ll);
-      await _animateCamera(ll);
-      await _reverseGeocode(ll);
-      _sessionToken = null;
-      return;
-    }
-
-    // Résultat Places API (New) : Place Details pour obtenir les coordonnées
-    if (placeId.isEmpty) return;
-    final key = Env.googleMapsKey;
-    if (key.isEmpty || key.contains('REMPLACER')) return;
-
     setState(() => _geocoding = true);
     try {
-      final queryParams = <String, String>{
-        'languageCode': 'fr',
-        'regionCode': 'BJ',
-        if (_sessionToken != null) 'sessionToken': _sessionToken!,
-      };
-      final uri = Uri.https(
-        'places.googleapis.com',
-        '$_kPlaceDetailsBase/$placeId',
-        queryParams,
+      final coords = await AdresseSearchService.getCoordinates(
+        lieu: result,
+        googleMapsKey: Env.googleMapsKey,
+        sessionToken: _sessionToken,
       );
-
-      final resp = await http.get(
-        uri,
-        headers: {
-          'X-Goog-Api-Key': key,
-          'X-Goog-FieldMask': 'location,formattedAddress',
-        },
-      ).timeout(const Duration(seconds: 8));
-
-      debugPrint('[Places Details New] status=${resp.statusCode}');
-
       if (!mounted) return;
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body) as Map<String, dynamic>;
-        final location = data['location'] as Map<String, dynamic>?;
-        if (location != null) {
-          final ll = LatLng(
-            (location['latitude'] as num).toDouble(),
-            (location['longitude'] as num).toDouble(),
-          );
-          final formatted = data['formattedAddress'] as String? ?? description;
-          setState(() {
-            _address = formatted;
-            _marker = ll;
-            _searchCtrl.text = mainText.isNotEmpty ? mainText : formatted;
-          });
-          _recalc(ll);
-          await _animateCamera(ll);
-        }
-      } else {
-        debugPrint('[Places Details New] error: ${resp.body}');
+      if (coords != null) {
+        final ll = LatLng(coords.lat, coords.lng);
+        setState(() {
+          _address =
+              coords.adresse.isNotEmpty ? coords.adresse : result.adresseComplete;
+          _marker = ll;
+          _searchCtrl.text = result.titre;
+        });
+        _recalc(ll);
+        await _animateCamera(ll);
+        if (result.lat != null) await _reverseGeocode(ll);
       }
-    } catch (e) {
-      debugPrint('[Places Details New] exception: $e');
     } finally {
       if (mounted) setState(() => _geocoding = false);
       _sessionToken = null;
@@ -1318,8 +978,8 @@ class _AdressePageState extends State<AdressePage> {
 // Places API (New) — structuredFormat.mainText / structuredFormat.secondaryText
 
 class _PredictionsList extends StatelessWidget {
-  final List<Map<String, dynamic>> results;
-  final Future<void> Function(Map<String, dynamic> result) onSelect;
+  final List<LieuSuggestion> results;
+  final Future<void> Function(LieuSuggestion result) onSelect;
 
   const _PredictionsList({required this.results, required this.onSelect});
 
@@ -1332,19 +992,11 @@ class _PredictionsList extends StatelessWidget {
           Divider(height: 1, color: Colors.grey.shade200),
       itemBuilder: (_, i) {
         final r = results[i];
-        final mainText = r['mainText'] as String?;
-        final secondaryText = r['secondaryText'] as String?;
-        final description = r['description'] as String? ?? '';
-        final distKm = r['distanceKm'] as double?;
-
-        final hasStructured = mainText != null && mainText.isNotEmpty;
-        final titleText = hasStructured ? mainText : description.split(',').first.trim();
-        // Sous-titre : secondaryText (Places API) ou reste de la description (Nominatim)
-        final subtitleText = (secondaryText != null && secondaryText.isNotEmpty)
-            ? secondaryText
-            : description.contains(',')
-                ? description.split(',').skip(1).join(',').trim()
-                : null;
+        final titleText =
+            r.titre.isNotEmpty ? r.titre : r.adresseComplete.split(',').first.trim();
+        final subtitleText =
+            r.sousTitre.isNotEmpty ? r.sousTitre : null;
+        final distKm = r.distanceKm;
 
         return InkWell(
           onTap: () => onSelect(r),
