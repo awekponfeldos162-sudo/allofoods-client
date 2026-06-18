@@ -251,19 +251,30 @@ exports.initFedaPayPayment = onCall({ region: "europe-west1" }, async (request) 
 
   try {
     const result = await _fedaPayRequest("POST", "/v1/transactions", {
-      description:  `allofoods — ${restaurantName}`,
+      description:        `allofoods — ${restaurantName}`,
       amount,
-      currency:     { iso: "XOF" },
-      callback_url: "https://allofoods-5d32b.web.app/payment/callback",
-      customer:     { firstname: customerName, email: customerEmail },
-      metadata:     { order_id: orderId },
+      currency:           { iso: "XOF" },
+      callback_url:       "https://allofoods-5d32b.web.app/payment/callback",
+      merchant_reference: orderId,
+      customer:           { firstname: customerName, email: customerEmail },
+      custom_metadata:    {
+        order_id:        orderId,
+        restaurant_id:   order.restaurantId ?? "",
+        restaurant_name: restaurantName,
+        client_uid:      request.auth.uid,
+      },
     });
 
-    const tx    = result?.v1_transaction ?? result;
-    const txId  = tx?.id;
-    const token = tx?.payment_token?.token ?? "";
-
+    const tx   = result?.v1_transaction ?? result;
+    const txId = tx?.id;
     if (!txId) throw new Error(`FedaPay: pas d'ID — ${JSON.stringify(result)}`);
+
+    // Token : depuis la réponse si présent, sinon appel à l'endpoint dédié
+    let token = tx?.payment_token?.token ?? "";
+    if (!token) {
+      const tokenResult = await _fedaPayRequest("POST", `/v1/transactions/${txId}/token`, {});
+      token = tokenResult?.token ?? tokenResult?.v1_token?.token ?? "";
+    }
 
     const paymentUrl = token
       ? `${_FEDAPAY_CHECKOUT}/v1/checkout-button/transactions/${token}`
@@ -305,9 +316,14 @@ exports.sendFedaPayMomo = onCall({ region: "europe-west1" }, async (request) => 
   }
 
   try {
-    await _fedaPayRequest("POST", `/v1/transactions/${token}/send_now`, {
-      phone_number: { number: phoneNumber, country: "BJ" },
-      method:       operator,
+    // FedaPay send_now attend le format local béninois (8 chiffres, sans "229")
+    // _apiPhone Flutter envoie "22996XXXXXX" → on retire le préfixe "229"
+    const localPhone = phoneNumber.startsWith("229") ? phoneNumber.slice(3) : phoneNumber;
+
+    // Endpoint FedaPay sans redirection : POST /v1/{operator}
+    await _fedaPayRequest("POST", `/v1/${operator}`, {
+      token,
+      phone_number: { number: localPhone, country: "bj" },
     });
 
     console.log(`[sendFedaPayMomo] USSD envoyé → ${phoneNumber} (${operator})`);
@@ -395,8 +411,12 @@ exports.fedapayWebhook = onRequest(
     const status = tx?.status ?? "";                // "approved" | "declined" | "canceled"
     const amount = tx?.amount ?? 0;
 
-    // L'orderId est stocké dans metadata lors de createTransaction()
-    const orderId = tx?.metadata?.order_id ?? tx?.reference ?? "";
+    // L'orderId est dans custom_metadata (nouveau) ou merchant_reference ou metadata (ancien)
+    const orderId = tx?.custom_metadata?.order_id
+      ?? tx?.metadata?.order_id
+      ?? tx?.merchant_reference
+      ?? tx?.reference
+      ?? "";
 
     console.log(`[fedapayWebhook] event=${name} txId=${txId} status=${status} orderId=${orderId}`);
 
