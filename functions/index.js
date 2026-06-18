@@ -316,34 +316,32 @@ exports.sendFedaPayMomo = onCall({ region: "europe-west1" }, async (request) => 
   if (!phoneNumber) throw new HttpsError("invalid-argument", "Numéro de téléphone manquant");
   if (!_FEDAPAY_SECRET) throw new HttpsError("internal", "Configuration paiement manquante");
 
-  // Opérateurs non disponibles pour le push direct → fallback checkout WebView
-  const supportedOperators = ["mtn_open", "moov", "celtis"];
-  if (!supportedOperators.includes(operator)) {
-    return { useCheckout: true, message: "Opérateur non disponible pour le push direct." };
+  // FedaPay push sans redirection : MTN Bénin + Moov Bénin uniquement
+  // Celtis n'est PAS supporté par FedaPay pour le USSD push → toujours checkout
+  const pushOperators = ["mtn_open", "moov"];
+  if (!pushOperators.includes(operator)) {
+    console.log(`[sendFedaPayMomo] ${operator} non supporté pour push → checkout WebView`);
+    return { useCheckout: true, message: `Paiement ${operator} via page sécurisée FedaPay.` };
   }
 
   try {
     // FedaPay send_now attend le format local béninois (8 chiffres, sans "229")
-    // _apiPhone Flutter envoie "22996XXXXXX" → on retire le préfixe "229"
     const localPhone = phoneNumber.startsWith("229") ? phoneNumber.slice(3) : phoneNumber;
+    console.log(`[sendFedaPayMomo] Envoi USSD → ${localPhone} (${operator})`);
 
-    // Endpoint FedaPay sans redirection : POST /v1/{operator}
-    await _fedaPayRequest("POST", `/v1/${operator}`, {
+    const sendResult = await _fedaPayRequest("POST", `/v1/${operator}`, {
       token,
       phone_number: { number: localPhone, country: "bj" },
     });
 
-    console.log(`[sendFedaPayMomo] USSD envoyé → ${phoneNumber} (${operator})`);
+    // Log complet pour diagnostic USSD
+    console.log(`[sendFedaPayMomo] Réponse FedaPay:`, JSON.stringify(sendResult));
     return { success: true, message: "Notification USSD envoyée. Confirmez sur votre téléphone." };
 
   } catch (e) {
-    console.error("[sendFedaPayMomo] Erreur:", e.message);
-
-    // Si l'opérateur rejette le push → proposer le checkout WebView
-    if (e.message?.includes("400") || e.message?.includes("422")) {
-      return { useCheckout: true, message: "Push non disponible pour cet opérateur. Utilisation du checkout." };
-    }
-    throw new HttpsError("internal", `Erreur push MoMo : ${e.message}`);
+    // Tout échec du push → fallback checkout (jamais d'erreur fatale côté client)
+    console.error("[sendFedaPayMomo] Erreur push:", e.message);
+    return { useCheckout: true, message: "Push non disponible. Paiement via page sécurisée." };
   }
 });
 
@@ -582,16 +580,17 @@ exports.fedapayWebhook = onRequest(
           }
         }
 
-        // ── Notifier le restaurant — paiement confirmé (2e notification) ──
+        // ── Notifier le restaurant — seule notification après paiement confirmé ──
         if (restaurantId) {
-          const restSnap  = await db.collection("restaurants").doc(restaurantId).get();
-          const restToken = restSnap.data()?.fcmToken;
+          const restSnap   = await db.collection("restaurants").doc(restaurantId).get();
+          const restToken  = restSnap.data()?.fcmToken;
+          const itemCount  = (order.items ?? []).length;
           if (restToken) {
             await fcm.send({
               token: restToken,
               notification: {
-                title: "✅ Paiement confirmé — Préparez !",
-                body:  `${restoAmount.toLocaleString("fr-FR")} FCFA · Commencez la préparation.`,
+                title: "🍽️ Nouvelle commande — Payée !",
+                body:  `${itemCount} article${itemCount !== 1 ? "s" : ""} · ${restoAmount.toLocaleString("fr-FR")} FCFA — Préparez maintenant !`,
               },
               data: { type: "order_paid", orderId, screen: "order_detail" },
               android: {
@@ -655,10 +654,23 @@ exports.onNewOrder = onDocumentCreated("orders/{orderId}", async (event) => {
 
   const restaurantId   = order.restaurantId;
   const restaurantName = order.restaurantName ?? "Restaurant";
-  const itemCount      = (order.items ?? []).length;
-  const foodAmount     = order.foodAmount ?? order.totalAmount ?? 0;
 
-  console.log(`[onNewOrder] Nouvelle commande ${orderId} → ${restaurantName}`);
+  // Ne pas notifier le restaurant si la commande est en attente de paiement.
+  // La notification unique et définitive sera envoyée par fedapayWebhook
+  // après confirmation du paiement — évite les notifs fantômes pour commandes annulées.
+  if (order.status === "awaiting_payment") {
+    console.log(`[onNewOrder] ${orderId} en attente de paiement — notification différée`);
+    await db.collection("restaurants").doc(restaurantId).update({
+      "stats.pendingOrders": FieldValue.increment(1),
+      "stats.lastOrderAt":   FieldValue.serverTimestamp(),
+    }).catch(() => {});
+    return;
+  }
+
+  const itemCount  = (order.items ?? []).length;
+  const foodAmount = order.foodAmount ?? order.totalAmount ?? 0;
+
+  console.log(`[onNewOrder] Nouvelle commande payée ${orderId} → ${restaurantName}`);
 
   try {
     // ── Récupérer le token FCM du restaurant ──
@@ -670,8 +682,6 @@ exports.onNewOrder = onDocumentCreated("orders/{orderId}", async (event) => {
 
     const fcmToken = restSnap.data()?.fcmToken;
 
-    // ── Notifier le restaurant immédiatement pour toutes les commandes ──
-    // Une 2e notification "Paiement confirmé" sera envoyée par fedapayWebhook.
     if (fcmToken) {
       await fcm.send({
         token: fcmToken,
