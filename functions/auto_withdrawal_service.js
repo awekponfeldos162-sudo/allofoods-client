@@ -75,7 +75,7 @@ async function declencherAutoRetrait(restaurantId, balance) {
       },
     });
 
-    const payoutId = payoutResult?.payout?.id ?? payoutResult?.id;
+    const payoutId = payoutResult?.["v1/payout"]?.id ?? payoutResult?.payout?.id ?? payoutResult?.id;
     if (!payoutId) throw new Error(`FedaPay: pas d'ID — ${JSON.stringify(payoutResult)}`);
 
     // ── 2. Déclencher l'envoi immédiat ──────────────────
@@ -217,7 +217,7 @@ async function handleManualWithdrawal(request) {
       },
     });
 
-    const payoutId = payoutResult?.payout?.id ?? payoutResult?.id;
+    const payoutId = payoutResult?.["v1/payout"]?.id ?? payoutResult?.payout?.id ?? payoutResult?.id;
     if (!payoutId) throw new Error(`FedaPay: pas d'ID — ${JSON.stringify(payoutResult)}`);
 
     // ── 2. Déclencher l'envoi ───────────────────────────

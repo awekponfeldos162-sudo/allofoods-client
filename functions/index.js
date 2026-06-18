@@ -265,20 +265,27 @@ exports.initFedaPayPayment = onCall({ region: "europe-west1" }, async (request) 
       },
     });
 
-    const tx   = result?.v1_transaction ?? result;
+    // FedaPay retourne la clé "v1/transaction" (avec slash, pas underscore)
+    const tx   = result?.["v1/transaction"] ?? result?.v1_transaction ?? result;
     const txId = tx?.id;
     if (!txId) throw new Error(`FedaPay: pas d'ID — ${JSON.stringify(result)}`);
 
-    // Token : depuis la réponse si présent, sinon appel à l'endpoint dédié
-    let token = tx?.payment_token?.token ?? "";
+    // payment_token est un JWT string dans la réponse FedaPay (pas un objet)
+    let token = typeof tx?.payment_token === "string"
+      ? tx.payment_token
+      : (tx?.payment_token?.token ?? "");
+
     if (!token) {
       const tokenResult = await _fedaPayRequest("POST", `/v1/transactions/${txId}/token`, {});
-      token = tokenResult?.token ?? tokenResult?.v1_token?.token ?? "";
+      const tTx = tokenResult?.["v1/transaction"] ?? tokenResult?.v1_transaction ?? tokenResult;
+      token = typeof tTx?.payment_token === "string"
+        ? tTx.payment_token
+        : (tokenResult?.token ?? "");
     }
 
-    const paymentUrl = token
-      ? `${_FEDAPAY_CHECKOUT}/v1/checkout-button/transactions/${token}`
-      : "";
+    // payment_url est fournie directement dans la réponse FedaPay
+    const paymentUrl = tx?.payment_url
+      ?? (token ? `${_FEDAPAY_CHECKOUT}/v1/checkout-button/transactions/${token}` : "");
 
     // Sauvegarder l'ID de transaction dans la commande
     await db.collection("orders").doc(orderId).update({
@@ -354,7 +361,7 @@ exports.checkFedaPayStatus = onCall({ region: "europe-west1" }, async (request) 
 
   try {
     const result = await _fedaPayGet(`/v1/transactions/${transactionId}`);
-    const tx     = result?.v1_transaction ?? result;
+    const tx     = result?.["v1/transaction"] ?? result?.v1_transaction ?? result;
     const status = tx?.status ?? "";
 
     console.log(`[checkFedaPayStatus] tx=${transactionId} status=${status}`);
@@ -1500,7 +1507,7 @@ exports.adminApprovePayouts = onCall({ region: "europe-west1" }, async (request)
         metadata: { restaurant_id: restId, type: "admin_daily_payout", idempotency_key: idempotencyKey },
       });
 
-      const payoutId = payoutResult?.payout?.id ?? payoutResult?.id;
+      const payoutId = payoutResult?.["v1/payout"]?.id ?? payoutResult?.payout?.id ?? payoutResult?.id;
       if (!payoutId) throw new Error(`FedaPay: pas d'ID — ${JSON.stringify(payoutResult)}`);
 
       await _fedaPayRequest("PUT", `/v1/payouts/${payoutId}/send_now`, {});
@@ -1671,7 +1678,7 @@ exports.scheduledCloture = onSchedule(
           metadata: { restaurant_id: restId, type: "scheduled_cloture", idempotency_key: idempotencyKey },
         });
 
-        const payoutId = payoutResult?.payout?.id ?? payoutResult?.id;
+        const payoutId = payoutResult?.["v1/payout"]?.id ?? payoutResult?.payout?.id ?? payoutResult?.id;
         if (!payoutId) throw new Error(`FedaPay: pas d'ID — ${JSON.stringify(payoutResult)}`);
 
         // 2. Envoyer immédiatement
