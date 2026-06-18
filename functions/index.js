@@ -187,6 +187,174 @@ exports.monthlyPayoutAuto = payout.monthlyPayoutAuto;
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { declencherAutoRetrait, handleManualWithdrawal, COMMISSION_RATE, _fedaPayRequest } = require('./auto_withdrawal_service');
+const https = require("https");
+
+// ── Config FedaPay (partagée avec auto_withdrawal_service) ────────
+const _FEDAPAY_SECRET  = process.env.FEDAPAY_SECRET_KEY ?? "";
+const _FEDAPAY_SANDBOX = process.env.FEDAPAY_SANDBOX !== "false";
+const _FEDAPAY_BASE    = _FEDAPAY_SANDBOX ? "sandbox-api.fedapay.com" : "api.fedapay.com";
+const _FEDAPAY_CHECKOUT= _FEDAPAY_SANDBOX
+  ? "https://sandbox-checkout.fedapay.com"
+  : "https://checkout.fedapay.com";
+
+// ── GET helper FedaPay (sans body) ────────────────────────────────
+function _fedaPayGet(path) {
+  return new Promise((resolve, reject) => {
+    const opts = {
+      hostname: _FEDAPAY_BASE,
+      path,
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${_FEDAPAY_SECRET}`,
+        "Content-Type":  "application/json",
+      },
+    };
+    const req = https.request(opts, (res) => {
+      let data = "";
+      res.on("data",  chunk => { data += chunk; });
+      res.on("end", () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (res.statusCode >= 200 && res.statusCode < 300) resolve(parsed);
+          else reject(new Error(`FedaPay GET ${path} → HTTP ${res.statusCode}: ${data}`));
+        } catch { reject(new Error(`FedaPay parse error: ${data}`)); }
+      });
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PAIEMENT CLIENT — Étape 1 : Créer la transaction FedaPay
+// Callable : initFedaPayPayment({ orderId })
+// Retourne : { transactionId, token, paymentUrl }
+// ══════════════════════════════════════════════════════════════════
+exports.initFedaPayPayment = onCall({ region: "europe-west1" }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Non connecté");
+
+  const { orderId } = request.data ?? {};
+  if (!orderId) throw new HttpsError("invalid-argument", "orderId requis");
+  if (!_FEDAPAY_SECRET) throw new HttpsError("internal", "Configuration paiement manquante");
+
+  // Lire le montant depuis Firestore (non falsifiable côté client)
+  const orderSnap = await db.collection("orders").doc(orderId).get();
+  if (!orderSnap.exists) throw new HttpsError("not-found", "Commande introuvable");
+
+  const order          = orderSnap.data();
+  const amount         = order.paidOnline ?? order.totalAmount ?? 0;
+  const restaurantName = order.restaurantName ?? "Restaurant";
+  const customerName   = order.customerName   ?? "Client";
+  const customerEmail  = order.clientEmail    ?? request.auth.token.email ?? "client@allofoods.bj";
+
+  if (amount <= 0) throw new HttpsError("failed-precondition", "Montant invalide");
+
+  try {
+    const result = await _fedaPayRequest("POST", "/v1/transactions", {
+      description:  `allofoods — ${restaurantName}`,
+      amount,
+      currency:     { iso: "XOF" },
+      callback_url: "https://allofoods-5d32b.web.app/payment/callback",
+      customer:     { firstname: customerName, email: customerEmail },
+      metadata:     { order_id: orderId },
+    });
+
+    const tx    = result?.v1_transaction ?? result;
+    const txId  = tx?.id;
+    const token = tx?.payment_token?.token ?? "";
+
+    if (!txId) throw new Error(`FedaPay: pas d'ID — ${JSON.stringify(result)}`);
+
+    const paymentUrl = token
+      ? `${_FEDAPAY_CHECKOUT}/v1/checkout-button/transactions/${token}`
+      : "";
+
+    // Sauvegarder l'ID de transaction dans la commande
+    await db.collection("orders").doc(orderId).update({
+      fedaPayTransactionId: String(txId),
+      fedaPayToken:         token,
+      updatedAt:            FieldValue.serverTimestamp(),
+    });
+
+    console.log(`[initFedaPayPayment] Transaction ${txId} créée pour commande ${orderId}`);
+    return { transactionId: String(txId), token, paymentUrl };
+
+  } catch (e) {
+    console.error("[initFedaPayPayment] Erreur:", e.message);
+    throw new HttpsError("internal", `Erreur FedaPay : ${e.message}`);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// PAIEMENT CLIENT — Étape 2 : Pousser le paiement sur le téléphone
+// Callable : sendFedaPayMomo({ token, phoneNumber, operator })
+// Déclenche le USSD push sur le téléphone du client (send_now)
+// ══════════════════════════════════════════════════════════════════
+exports.sendFedaPayMomo = onCall({ region: "europe-west1" }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Non connecté");
+
+  const { token, phoneNumber, operator } = request.data ?? {};
+  if (!token)       throw new HttpsError("invalid-argument", "Token manquant");
+  if (!phoneNumber) throw new HttpsError("invalid-argument", "Numéro de téléphone manquant");
+  if (!_FEDAPAY_SECRET) throw new HttpsError("internal", "Configuration paiement manquante");
+
+  // Opérateurs non disponibles pour le push direct → fallback checkout WebView
+  const supportedOperators = ["mtn_open", "moov", "celtis"];
+  if (!supportedOperators.includes(operator)) {
+    return { useCheckout: true, message: "Opérateur non disponible pour le push direct." };
+  }
+
+  try {
+    await _fedaPayRequest("POST", `/v1/transactions/${token}/send_now`, {
+      phone_number: { number: phoneNumber, country: "BJ" },
+      method:       operator,
+    });
+
+    console.log(`[sendFedaPayMomo] USSD envoyé → ${phoneNumber} (${operator})`);
+    return { success: true, message: "Notification USSD envoyée. Confirmez sur votre téléphone." };
+
+  } catch (e) {
+    console.error("[sendFedaPayMomo] Erreur:", e.message);
+
+    // Si l'opérateur rejette le push → proposer le checkout WebView
+    if (e.message?.includes("400") || e.message?.includes("422")) {
+      return { useCheckout: true, message: "Push non disponible pour cet opérateur. Utilisation du checkout." };
+    }
+    throw new HttpsError("internal", `Erreur push MoMo : ${e.message}`);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// PAIEMENT CLIENT — Étape 3 : Vérifier le statut du paiement
+// Callable : checkFedaPayStatus({ transactionId })
+// Retourne : { success, status, isPaid, isExpired, amount }
+// ══════════════════════════════════════════════════════════════════
+exports.checkFedaPayStatus = onCall({ region: "europe-west1" }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Non connecté");
+
+  const { transactionId } = request.data ?? {};
+  if (!transactionId) throw new HttpsError("invalid-argument", "transactionId requis");
+  if (!_FEDAPAY_SECRET) throw new HttpsError("internal", "Configuration paiement manquante");
+
+  try {
+    const result = await _fedaPayGet(`/v1/transactions/${transactionId}`);
+    const tx     = result?.v1_transaction ?? result;
+    const status = tx?.status ?? "";
+
+    console.log(`[checkFedaPayStatus] tx=${transactionId} status=${status}`);
+    return {
+      success:   true,
+      status,
+      isPaid:    status === "approved",
+      isExpired: status === "expired",
+      amount:    tx?.amount ?? 0,
+    };
+
+  } catch (e) {
+    console.error("[checkFedaPayStatus] Erreur:", e.message);
+    throw new HttpsError("internal", `Erreur vérification : ${e.message}`);
+  }
+});
 
 // ══════════════════════════════════════════════════════════════════
 // FEDAPAY WEBHOOK — Validation paiement côté serveur
@@ -387,20 +555,26 @@ exports.fedapayWebhook = onRequest(
           }
         }
 
-        // ── Notifier le restaurant ──
+        // ── Notifier le restaurant — paiement confirmé (2e notification) ──
         if (restaurantId) {
-          const restSnap = await db.collection("restaurants").doc(restaurantId).get();
+          const restSnap  = await db.collection("restaurants").doc(restaurantId).get();
           const restToken = restSnap.data()?.fcmToken;
           if (restToken) {
             await fcm.send({
               token: restToken,
               notification: {
-                title: "🍽️ Nouvelle commande payée !",
-                body:  `${restoAmount} FCFA à préparer.`,
+                title: "✅ Paiement confirmé — Préparez !",
+                body:  `${restoAmount.toLocaleString("fr-FR")} FCFA · Commencez la préparation.`,
               },
-              data: { type: "new_order", orderId, screen: "order_detail" },
-              android: { priority: "high", notification: { sound: "default", channelId: "allofoods_orders" } },
-              apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default", contentAvailable: 1 } } },
+              data: { type: "order_paid", orderId, screen: "order_detail" },
+              android: {
+                priority: "high",
+                notification: { sound: "alarme", channelId: "allofoods_orders" },
+              },
+              apns: {
+                headers: { "apns-priority": "10" },
+                payload: { aps: { sound: "alarme.mp3", contentAvailable: 1, "interruption-level": "critical" } },
+              },
             }).catch(e => console.error("[fedapayWebhook] FCM restaurant error:", e));
           }
         }
@@ -454,32 +628,29 @@ exports.onNewOrder = onDocumentCreated("orders/{orderId}", async (event) => {
 
   const restaurantId   = order.restaurantId;
   const restaurantName = order.restaurantName ?? "Restaurant";
-  const totalAmount    = order.totalAmount ?? 0;
   const itemCount      = (order.items ?? []).length;
-  const paymentMethod  = order.paymentMethod ?? "online";
+  const foodAmount     = order.foodAmount ?? order.totalAmount ?? 0;
 
-  console.log(`[onNewOrder] Nouvelle commande ${orderId} → ${restaurantName} (paiement: ${paymentMethod})`);
+  console.log(`[onNewOrder] Nouvelle commande ${orderId} → ${restaurantName}`);
 
   try {
     // ── Récupérer le token FCM du restaurant ──
     const restSnap = await db.collection("restaurants").doc(restaurantId).get();
     if (!restSnap.exists) {
-      console.warn(`Restaurant ${restaurantId} introuvable`);
+      console.warn(`[onNewOrder] Restaurant ${restaurantId} introuvable`);
       return;
     }
 
-    const restData = restSnap.data();
-    const fcmToken = restData?.fcmToken;
+    const fcmToken = restSnap.data()?.fcmToken;
 
-    // ── Notifier le restaurant uniquement pour les commandes cash ──
-    // Pour les paiements en ligne, la notification est envoyée par fedapayWebhook
-    // après confirmation du paiement (évite de notifier pour des commandes non payées).
-    if (fcmToken && paymentMethod === "cash") {
+    // ── Notifier le restaurant immédiatement pour toutes les commandes ──
+    // Une 2e notification "Paiement confirmé" sera envoyée par fedapayWebhook.
+    if (fcmToken) {
       await fcm.send({
         token: fcmToken,
         notification: {
-          title: "🍽️ Nouvelle commande (espèces) !",
-          body: `${itemCount} article${itemCount > 1 ? "s" : ""} · ${totalAmount} FCFA`,
+          title: "🍽️ Nouvelle commande !",
+          body:  `${itemCount} article${itemCount > 1 ? "s" : ""} · ${foodAmount.toLocaleString("fr-FR")} FCFA`,
         },
         data: {
           type:    "new_order",
@@ -490,19 +661,21 @@ exports.onNewOrder = onDocumentCreated("orders/{orderId}", async (event) => {
           priority: "high",
           notification: { sound: "alarme", channelId: "allofoods_orders" },
         },
-        apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "alarme.mp3", contentAvailable: 1, "interruption-level": "critical" } } },
+        apns: {
+          headers: { "apns-priority": "10" },
+          payload: { aps: { sound: "alarme.mp3", contentAvailable: 1, "interruption-level": "critical" } },
+        },
       });
-      console.log(`[onNewOrder] Notification cash envoyée à ${restaurantName}`);
-    } else if (paymentMethod !== "cash") {
-      console.log(`[onNewOrder] Paiement en ligne — notification différée au webhook FedaPay`);
+      console.log(`[onNewOrder] Notif envoyée à ${restaurantName} — commande ${orderId}`);
+    } else {
+      console.warn(`[onNewOrder] Pas de token FCM pour ${restaurantName} (${restaurantId})`);
     }
 
-    // ── Mettre à jour les stats du restaurant ──
+    // ── Stats du restaurant (comptées à la création, avant paiement) ──
     await db.collection("restaurants").doc(restaurantId).update({
-      "stats.totalOrders":    FieldValue.increment(1),
-      "stats.totalRevenue":   FieldValue.increment(totalAmount),
-      "stats.lastOrderAt":    FieldValue.serverTimestamp(),
-    });
+      "stats.pendingOrders": FieldValue.increment(1),
+      "stats.lastOrderAt":   FieldValue.serverTimestamp(),
+    }).catch(() => {}); // Non-bloquant si le champ n'existe pas encore
 
   } catch (err) {
     console.error("[onNewOrder] Erreur:", err);
@@ -1044,7 +1217,7 @@ exports.onNewChatMessage = onDocumentCreated(
 // Callable Function : requestManualWithdrawal({ restaurantId })
 // Prérequis : wallet_balance >= 10 000 FCFA + numéro MoMo configuré
 // ══════════════════════════════════════════════════════════════════
-// requestManualWithdrawal supprimé — déjà déployé dans codebase allofoods-admin
+exports.requestManualWithdrawal = onCall({ region: "europe-west1" }, handleManualWithdrawal);
 
 exports.onSupportTicketEmail = onDocumentCreated(
   "support_tickets/{ticketId}",

@@ -9,6 +9,7 @@
 
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging }             = require("firebase-admin/messaging");
+const { HttpsError }               = require("firebase-functions/v2/https");
 const https                        = require("https");
 
 const db  = getFirestore();
@@ -26,8 +27,6 @@ const FEDAPAY_BASE    = FEDAPAY_SANDBOX
   ? "sandbox-api.fedapay.com"
   : "api.fedapay.com";
 
-// ══════════════════════════════════════════════════════
-// RETRAIT AUTOMATIQUE — déclenché par le webhook
 // ══════════════════════════════════════════════════════
 
 /**
@@ -152,24 +151,25 @@ async function declencherAutoRetrait(restaurantId, balance) {
 // ══════════════════════════════════════════════════════
 
 /**
- * @param {object} data           — { restaurantId: string }
- * @param {object} context        — contexte Firebase auth
+ * @param {object} request  — Firebase Functions v2 callable request
+ *   request.auth           — contexte Firebase auth
+ *   request.data           — { restaurantId: string }
  * @returns {Promise<{success, amount, payout_id}>}
  */
-async function handleManualWithdrawal(data, context) {
-  // Vérification authentification
-  if (!context.auth) {
-    throw { code: "unauthenticated", message: "Non connecté" };
+async function handleManualWithdrawal(request) {
+  // Vérification authentification (v2 callable)
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Non connecté");
   }
 
-  const { restaurantId } = data;
+  const { restaurantId } = request.data;
   if (!restaurantId) {
-    throw { code: "invalid-argument", message: "restaurantId manquant" };
+    throw new HttpsError("invalid-argument", "restaurantId manquant");
   }
 
   const restSnap = await db.collection("restaurants").doc(restaurantId).get();
   if (!restSnap.exists) {
-    throw { code: "not-found", message: "Restaurant introuvable" };
+    throw new HttpsError("not-found", "Restaurant introuvable");
   }
 
   const rest    = restSnap.data();
@@ -177,28 +177,28 @@ async function handleManualWithdrawal(data, context) {
 
   // Vérifications métier
   if (balance < MIN_WITHDRAWAL) {
-    throw {
-      code:    "failed-precondition",
-      message: `Minimum ${MIN_WITHDRAWAL.toLocaleString()} FCFA requis. Solde actuel : ${balance.toLocaleString()} FCFA`,
-    };
+    throw new HttpsError(
+      "failed-precondition",
+      `Minimum ${MIN_WITHDRAWAL.toLocaleString()} FCFA requis. Solde actuel : ${balance.toLocaleString()} FCFA`,
+    );
   }
 
   if (!rest.momo_number) {
-    throw { code: "not-found", message: "Numéro MoMo non configuré dans votre profil" };
+    throw new HttpsError("not-found", "Numéro MoMo non configuré dans votre profil");
   }
 
   // Vérifier la réserve allofoods
   const financesSnap = await db.collection("admin").doc("finances").get();
   const reserve = financesSnap.data()?.reserve_disponible ?? 0;
   if (reserve < balance) {
-    throw {
-      code:    "resource-exhausted",
-      message: `Réserve insuffisante (${reserve.toLocaleString("fr-FR")} FCFA dispo, ${balance.toLocaleString("fr-FR")} demandé). Réessayez plus tard.`,
-    };
+    throw new HttpsError(
+      "resource-exhausted",
+      `Réserve insuffisante (${reserve.toLocaleString("fr-FR")} FCFA dispo, ${balance.toLocaleString("fr-FR")} demandé). Réessayez plus tard.`,
+    );
   }
 
   if (!FEDAPAY_SECRET) {
-    throw { code: "internal", message: "Configuration paiement manquante" };
+    throw new HttpsError("internal", "Configuration paiement manquante");
   }
 
   try {
@@ -281,7 +281,7 @@ async function handleManualWithdrawal(data, context) {
       created_at:    FieldValue.serverTimestamp(),
     });
 
-    throw { code: "internal", message: `Virement échoué : ${e.message ?? e}` };
+    throw new HttpsError("internal", `Virement échoué : ${e.message ?? e}`);
   }
 }
 

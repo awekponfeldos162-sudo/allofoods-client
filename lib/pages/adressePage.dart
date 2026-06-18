@@ -68,7 +68,8 @@ class _AdressePageState extends State<AdressePage> {
   // en une seule session pour optimiser la facturation.
   String? _sessionToken;
 
-  // Adresses récentes
+  // Adresses sauvegardées (Domicile, Travail, etc.) + récentes
+  List<Map<String, dynamic>> _savedAddresses = [];
   List<Map<String, dynamic>> _recentAddresses = [];
 
   String? get _uid => FirebaseAuth.instance.currentUser?.uid;
@@ -88,6 +89,7 @@ class _AdressePageState extends State<AdressePage> {
       _recalc(_cotonou);
       _getLocation();
       _loadRecentAddresses();
+      _loadSavedAddresses();
     });
   }
 
@@ -142,6 +144,24 @@ class _AdressePageState extends State<AdressePage> {
           'usedAt': FieldValue.serverTimestamp(),
         });
       }
+    } catch (_) {}
+  }
+
+  Future<void> _loadSavedAddresses() async {
+    final uid = _uid;
+    if (uid == null) return;
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('savedAddresses')
+          .orderBy('createdAt')
+          .limit(10)
+          .get();
+      if (!mounted) return;
+      setState(() {
+        _savedAddresses = snap.docs.map((d) => d.data()).toList();
+      });
     } catch (_) {}
   }
 
@@ -265,15 +285,22 @@ class _AdressePageState extends State<AdressePage> {
       if (!mounted) return;
       if (coords != null) {
         final ll = LatLng(coords.lat, coords.lng);
+        // Use the autocomplete name ("Centre Wedu Wedu") — formattedAddress from Place Details
+        // often returns street-number format ("989, Cotonou") for Beninese POI, so we avoid it.
+        final displayAddr = result.sousTitre.isNotEmpty
+            ? '${result.titre}, ${result.sousTitre}'
+            : result.titre;
         setState(() {
-          _address =
-              coords.adresse.isNotEmpty ? coords.adresse : result.adresseComplete;
+          _address = displayAddr.isNotEmpty
+              ? displayAddr
+              : (coords.adresse.isNotEmpty ? coords.adresse : result.adresseComplete);
           _marker = ll;
           _searchCtrl.text = result.titre;
         });
         _recalc(ll);
         await _animateCamera(ll);
-        if (result.lat != null) await _reverseGeocode(ll);
+        // Do NOT call _reverseGeocode here — the autocomplete name is already correct.
+        // _reverseGeocode is only used for GPS auto-location and manual map drag.
       }
     } finally {
       if (mounted) setState(() => _geocoding = false);
@@ -918,8 +945,9 @@ class _AdressePageState extends State<AdressePage> {
                             results: _results,
                             onSelect: _selectResult,
                           )
-                        : _RecentList(
-                            items: _recentAddresses,
+                        : _AddressList(
+                            savedAddresses: _savedAddresses,
+                            recentAddresses: _recentAddresses,
                             onSelect: (addr) async {
                               final lat = addr['lat'] as double?;
                               final lng = addr['lng'] as double?;
@@ -927,10 +955,17 @@ class _AdressePageState extends State<AdressePage> {
                                   addr['address'] as String? ?? '';
                               if (lat != null && lng != null) {
                                 final ll = LatLng(lat, lng);
+                                final label =
+                                    addr['label'] as String? ?? '';
                                 setState(() {
                                   _marker = ll;
                                   _address = address;
-                                  _searchCtrl.text = address;
+                                  _searchCtrl.text = label.isNotEmpty
+                                      ? label
+                                      : address
+                                          .split(',')
+                                          .first
+                                          .trim();
                                 });
                                 _recalc(ll);
                                 await _animateCamera(ll);
@@ -1070,50 +1105,153 @@ class _PredictionsList extends StatelessWidget {
   }
 }
 
-// ── Liste adresses récentes ───────────────────────────────────────────────────
+// ── Liste adresses (sauvegardées + récentes) ─────────────────────────────────
 
-class _RecentList extends StatelessWidget {
-  final List<Map<String, dynamic>> items;
-  final void Function(Map<String, dynamic>) onSelect;
+class _AddressList extends StatelessWidget {
+  final List<Map<String, dynamic>> savedAddresses;
+  final List<Map<String, dynamic>> recentAddresses;
+  final Future<void> Function(Map<String, dynamic>) onSelect;
 
-  const _RecentList({required this.items, required this.onSelect});
+  const _AddressList({
+    required this.savedAddresses,
+    required this.recentAddresses,
+    required this.onSelect,
+  });
+
+  static IconData _iconForType(String type) {
+    switch (type) {
+      case 'home':
+        return Icons.home_outlined;
+      case 'work':
+        return Icons.work_outline;
+      default:
+        return Icons.location_on_outlined;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) return const SizedBox.shrink();
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      itemCount: items.length,
-      separatorBuilder: (_, __) =>
-          Divider(height: 1, color: Colors.grey.shade200),
-      itemBuilder: (_, i) {
-        final item = items[i];
-        final address = item['address'] as String? ?? '';
-        // Séparer nom du lieu et reste de l'adresse
-        final parts = address.split(',');
-        final title = parts.first.trim();
-        final subtitle =
-            parts.length > 1 ? parts.skip(1).join(',').trim() : null;
+    final hasSaved = savedAddresses.isNotEmpty;
+    final hasRecent = recentAddresses.isNotEmpty;
+    if (!hasSaved && !hasRecent) return const SizedBox.shrink();
 
-        return ListTile(
-          dense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-          leading: Icon(Icons.history, color: Colors.grey.shade500, size: 18),
-          title: Text(title,
-              style: const TextStyle(fontSize: 13),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
-          subtitle: subtitle != null && subtitle.isNotEmpty
-              ? Text(subtitle,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis)
-              : null,
-          onTap: () => onSelect(item),
-        );
-      },
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      children: [
+        if (hasSaved) ...[
+          _AddressLabel('Enregistrées'),
+          for (final addr in savedAddresses)
+            _AddressTile(
+              icon: _iconForType(addr['type'] as String? ?? 'custom'),
+              title: addr['label'] as String? ?? 'Adresse',
+              subtitle: addr['address'] as String? ?? '',
+              onTap: () => onSelect(addr),
+            ),
+          if (hasRecent)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Divider(height: 1, color: Colors.grey.shade200),
+            ),
+        ],
+        if (hasRecent) ...[
+          _AddressLabel('Récentes'),
+          for (final addr in recentAddresses)
+            _AddressTile(
+              icon: Icons.history,
+              title: (addr['address'] as String? ?? '').split(',').first.trim(),
+              subtitle: () {
+                final parts =
+                    (addr['address'] as String? ?? '').split(',');
+                return parts.length > 1
+                    ? parts.skip(1).join(',').trim()
+                    : '';
+              }(),
+              onTap: () => onSelect(addr),
+            ),
+        ],
+      ],
     );
   }
+}
+
+class _AddressLabel extends StatelessWidget {
+  final String text;
+  const _AddressLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
+        child: Text(
+          text.toUpperCase(),
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: Colors.grey.shade500,
+            letterSpacing: 0.8,
+          ),
+        ),
+      );
+}
+
+class _AddressTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _AddressTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: Colors.orange, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.grey.shade500),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
 }
 
 // ── Bouton carte rond ─────────────────────────────────────────────────────────
