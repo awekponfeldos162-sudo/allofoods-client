@@ -103,46 +103,45 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Fix crash SIGABRT sur Android < 33 (SurfaceProducer + ImageReader fence non supporté)
-  // Hybrid Composition évite le path ImageReader entièrement
   final mapsImpl = GoogleMapsFlutterPlatform.instance;
   if (mapsImpl is GoogleMapsFlutterAndroid) {
     mapsImpl.useAndroidViewSurface = true;
   }
 
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
     statusBarBrightness: Brightness.light,
   ));
 
-  // Capture toutes les erreurs Flutter pour éviter les crashs silencieux (ANR)
   FlutterError.onError =
       (details) => debugPrint('[Flutter Error] ${details.exceptionAsString()}');
 
-  await initializeDateFormatting('fr_FR', null);
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // Toutes ces opérations sont indépendantes — on les lance en parallèle
+  await Future.wait([
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
+    initializeDateFormatting('fr_FR', null),
+    Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
+    dotenv.load(fileName: '.env'),
+  ]);
 
-  await dotenv.load(fileName: '.env');
+  // Supabase en arrière-plan — réseau, non nécessaire au premier affichage
+  // (utilisé uniquement pour l'upload de photos, après que l'app est déjà visible)
+  () async {
+    try {
+      await Supabase.initialize(url: Env.supabaseUrl, anonKey: Env.supabaseAnonKey);
+    } catch (e) {
+      debugPrint('[Supabase] init: $e');
+    }
+  }();
 
-  // Initialiser Supabase (storage photos)
-  await Supabase.initialize(
-    url: Env.supabaseUrl,
-    anonKey: Env.supabaseAnonKey,
-  );
-
-  // Persistance Firestore offline
-  FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: true,
-  );
-
-  // Enregistrer le handler FCM background
+  // Synchrone — pas de réseau
+  FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: true);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // Créer le canal Android avec importance MAX
-  await _createAndroidNotificationChannel();
+  // Canal notifications en arrière-plan — non nécessaire avant le 1er message
+  _createAndroidNotificationChannel()
+      .catchError((e) => debugPrint('[FCM] channel: $e'));
 
   runApp(
     MultiProvider(
@@ -272,6 +271,43 @@ class allofoodsApp extends StatelessWidget {
   }
 }
 
+// SPLASH SCREEN — affiché pendant Firebase auth + Firestore user doc
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+  @override
+  Widget build(BuildContext context) => const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.fastfood, color: Colors.orange, size: 64),
+              SizedBox(height: 16),
+              Text(
+                'allofoods',
+                style: TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Poppins',
+                  letterSpacing: 1,
+                ),
+              ),
+              SizedBox(height: 32),
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Colors.orange,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
 // AUTH GATE  avec initialisation FCM
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
@@ -288,7 +324,7 @@ class _AuthGateState extends State<AuthGate> {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(backgroundColor: Colors.white);
+          return const _SplashScreen();
         }
         final user = snapshot.data;
         if (user != null) {
@@ -299,7 +335,7 @@ class _AuthGateState extends State<AuthGate> {
                 .snapshots(),
             builder: (context, userSnap) {
               if (userSnap.connectionState == ConnectionState.waiting) {
-                return const Scaffold(backgroundColor: Colors.white);
+                return const _SplashScreen();
               }
               final data =
                   userSnap.data?.data() as Map<String, dynamic>?;
