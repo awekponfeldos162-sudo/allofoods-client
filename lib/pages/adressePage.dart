@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -415,7 +416,7 @@ class _AdressePageState extends State<AdressePage> {
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 16),
-            _Input(_nameCtrl, 'Entrer le nom (Optionnel)', Icons.person_outlined),
+            _Input(_nameCtrl, 'Nom du contact (optionnel)', Icons.person_outlined),
             const SizedBox(height: 10),
             _PhoneInput(_phoneCtrl),
             const SizedBox(height: 10),
@@ -1321,9 +1322,12 @@ class _PhoneInput extends StatelessWidget {
   Widget build(BuildContext context) => TextField(
         controller: ctrl,
         keyboardType: TextInputType.phone,
+        maxLength: 10,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         decoration: InputDecoration(
-          hintText: '+229',
+          hintText: '01 XX XX XX XX',
           hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+          counterText: '',
           prefixIcon: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
