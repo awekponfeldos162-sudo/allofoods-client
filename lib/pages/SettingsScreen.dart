@@ -1,17 +1,17 @@
 ﻿// lib/pages/SettingsScreen.dart
-// ? Firebase : _logout() ? FirebaseAuth.signOut() (AuthGate redirige auto)
-//              _ProfileInfoPage ? Firestore users/{uid}
+// ✓ Firebase : _logout() — FirebaseAuth.signOut() (AuthGate redirige auto)
+//              _ProfileInfoPage — Firestore users/{uid}
 
 import 'package:flutter/material.dart';
 import 'package:flutter_application_2/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/language_provider.dart';
 import '../l10n/app_localizations.dart';
 import 'SecurityPage.dart';
 import 'SupportPage.dart';
-import 'TermsPage.dart';
 import 'PrivacyPage.dart';
 import 'OrderHistoryPage.dart';
 
@@ -187,7 +187,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.description_outlined,
             iconColor: Colors.grey,
             title: t.termsOfUse,
-            onTap: () => _goTo(const TermsPage()),
+            onTap: () => _openTermsOfUse(),
           ),
           SettingsTile(
             icon: Icons.info_outline,
@@ -222,6 +222,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _goTo(Widget page) =>
       Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+
+  // Conditions d'utilisation — page officielle sur le site, toujours à jour
+  // (plutôt qu'une copie figée dans l'app qu'il faudrait redéployer à
+  // chaque changement légal).
+  Future<void> _openTermsOfUse() async {
+    final uri = Uri.parse('https://allofoods.web.app/conditions-utilisation');
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      _snack('Impossible d\'ouvrir la page — vérifiez votre connexion.', error: true);
+    }
+  }
 
   void _snack(String msg, {bool error = false}) {
     ScaffoldMessenger.of(context)
@@ -289,7 +300,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // DéCONNEXION é Firebase Auth
+  // DÉCONNEXION — Firebase Auth
   // AuthGate détecte authStateChanges() ? redirige automatiquement
   Future<void> _logout() async {
     final t = AppLocalizations.of(context);
@@ -317,7 +328,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-// PAGE INFOS PERSONNELLES é Firestore
+// PAGE INFOS PERSONNELLES — Firestore
 class _ProfileInfoPage extends StatefulWidget {
   const _ProfileInfoPage();
   @override
@@ -365,7 +376,7 @@ class _ProfileInfoPageState extends State<_ProfileInfoPage> {
     final name = _nameCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
     if (name.isEmpty) {
-      _snack('Le nom ne peut pas étre vide', error: true);
+      _snack('Le nom ne peut pas être vide', error: true);
       return;
     }
     setState(() => _saving = true);

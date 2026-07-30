@@ -5,6 +5,7 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -12,6 +13,16 @@ import 'chat_page.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/active_order_notifier.dart';
+import '../theme/app_theme.dart';
+import '../widgets/premium/premium.dart';
+
+// Spécification d'une particule de confetti (popup livraison effectuée)
+class _ConfettiSpec {
+  final String emoji;
+  final double dx, dy;
+  final Duration delay;
+  const _ConfettiSpec({required this.emoji, required this.dx, required this.dy, required this.delay});
+}
 
 class TrackingPage extends StatefulWidget {
   final String orderId;
@@ -30,10 +41,22 @@ class TrackingPage extends StatefulWidget {
 }
 
 class _TrackingPageState extends State<TrackingPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   // Animation pulsation
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseAnim;
+
+  // Animation de déplacement fluide du marker livreur entre deux positions
+  // Firestore (évite le "saut" brusque façon Uber Eats/Glovo).
+  AnimationController? _driverMoveCtrl;
+  LatLng? _driverAnimFrom;
+  LatLng? _driverAnimTo;
+  LatLng? _driverPosDisplayed;
+
+  static LatLng _lerpLatLng(LatLng a, LatLng b, double t) => LatLng(
+        a.latitude + (b.latitude - a.latitude) * t,
+        a.longitude + (b.longitude - a.longitude) * t,
+      );
 
   // Données commande
   String _status = 'pending';
@@ -70,7 +93,12 @@ class _TrackingPageState extends State<TrackingPage>
   static const _cotonou = LatLng(6.365, 2.418);
 
   // Steps du stepper visuel — correspondent aux vrais statuts Firestore
-  static const _statusSteps = ['pending', 'delivering', 'en_route', 'delivered'];
+  static const _statusBarSteps = [
+    OrderStatusStep(key: 'pending', label: 'Reçue', icon: Icons.receipt_outlined),
+    OrderStatusStep(key: 'delivering', label: 'Confirmée', icon: Icons.check_circle_outline),
+    OrderStatusStep(key: 'en_route', label: 'En route', icon: Icons.delivery_dining),
+    OrderStatusStep(key: 'delivered', label: 'Livrée', icon: Icons.celebration),
+  ];
   Map<String, String> _statusLabels(AppLocalizations t) => {
     'pending':          t.statusPending,
     'paid':             t.statusPending,          // payé mais restaurant n'a pas encore commencé
@@ -108,6 +136,15 @@ class _TrackingPageState extends State<TrackingPage>
     _pulseAnim = Tween<double>(begin: 0.8, end: 1.2)
         .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
 
+    _driverMoveCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
+      ..addListener(() {
+        if (_driverAnimFrom == null || _driverAnimTo == null) return;
+        setState(() {
+          _driverPosDisplayed =
+              _lerpLatLng(_driverAnimFrom!, _driverAnimTo!, Curves.easeInOut.transform(_driverMoveCtrl!.value));
+        });
+      });
+
     _orderSub = FirebaseFirestore.instance
         .collection('orders')
         .doc(widget.orderId)
@@ -125,6 +162,7 @@ class _TrackingPageState extends State<TrackingPage>
   void dispose() {
     _orderNotifier?.setOrderPageOpen(false);
     _pulseCtrl.dispose();
+    _driverMoveCtrl?.dispose();
     _orderSub?.cancel();
     _stopLiveTracking();
     _mapCtrl?.dispose();
@@ -147,6 +185,21 @@ class _TrackingPageState extends State<TrackingPage>
         'customerLiveLng': pos.longitude,
       });
     });
+  }
+
+  // Marker livreur — position interpolée pour un déplacement fluide sur la carte.
+  Marker? get _driverMarker {
+    final pos = _driverPosDisplayed;
+    if (pos == null) return null;
+    return Marker(
+      markerId: const MarkerId('driver'),
+      position: pos,
+      icon: _driverBitmap ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      infoWindow: InfoWindow(
+        title: _driverName.isEmpty ? AppLocalizations.of(context).driverLabel : _driverName,
+        snippet: AppLocalizations.of(context).enRouteBike,
+      ),
+    );
   }
 
   void _stopLiveTracking() {
@@ -262,16 +315,14 @@ class _TrackingPageState extends State<TrackingPage>
             InfoWindow(title: AppLocalizations.of(context).yourAddress, snippet: AppLocalizations.of(context).destination),
       ));
     }
-    if (newDriver != null) {
-      markers.add(Marker(
-        markerId: const MarkerId('driver'),
-        position: newDriver,
-        icon: _driverBitmap ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        infoWindow: InfoWindow(
-          title: driverName.isEmpty ? AppLocalizations.of(context).driverLabel : driverName,
-          snippet: AppLocalizations.of(context).enRouteBike,
-        ),
-      ));
+    // Le marker livreur est géré séparément (animation fluide entre 2 positions) —
+    // voir _driverMarker et _driverMoveCtrl.
+    if (newDriver != null && _driverPos != null && newDriver != _driverPos) {
+      _driverAnimFrom = _driverPosDisplayed ?? _driverPos;
+      _driverAnimTo = newDriver;
+      _driverMoveCtrl?.forward(from: 0);
+    } else if (newDriver != null && _driverPos == null) {
+      _driverPosDisplayed = newDriver; // première apparition — pas d'animation
     }
 
     final vehicle = d['driverVehicle'] as Map<String, dynamic>? ?? {};
@@ -373,47 +424,67 @@ class _TrackingPageState extends State<TrackingPage>
   }
 
   void _showDeliveredDialog() {
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.cardRadius),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('🎉', style: TextStyle(fontSize: 60)),
-          const SizedBox(height: 12),
+          SizedBox(
+            height: 90,
+            child: Stack(alignment: Alignment.center, children: [
+              // Confettis — petits points colorés qui éclatent puis retombent
+              for (final p in _confettiSpecs)
+                Positioned(
+                  child: Text(p.emoji, style: const TextStyle(fontSize: 20))
+                      .animate(delay: p.delay)
+                      .fadeIn(duration: 200.ms)
+                      .moveY(begin: 0, end: p.dy, duration: 700.ms, curve: Curves.easeOut)
+                      .moveX(begin: 0, end: p.dx, duration: 700.ms, curve: Curves.easeOut)
+                      .fadeOut(delay: 400.ms, duration: 400.ms),
+                ),
+              const Text('🎉', style: TextStyle(fontSize: 60))
+                  .animate()
+                  .scaleXY(begin: 0, end: 1, duration: 500.ms, curve: Curves.elasticOut),
+            ]),
+          ),
+          const SizedBox(height: AppSpacing.sm),
           Text(AppLocalizations.of(context).deliveryDone,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center),
-          const SizedBox(height: 8),
+                  style: texts.headlineSmall, textAlign: TextAlign.center)
+              .animate()
+              .fadeIn(delay: 200.ms, duration: 300.ms)
+              .slideY(begin: 0.15, end: 0),
+          const SizedBox(height: AppSpacing.xs),
           Text(AppLocalizations.of(context).thankyouOrdered(widget.restaurantName),
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey)),
-          const SizedBox(height: 8),
-          Text('${widget.orderAmount} FCFA',
-              style: const TextStyle(
-                  color: Colors.orange,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18)),
+              textAlign: TextAlign.center, style: texts.bodyMedium),
+          const SizedBox(height: AppSpacing.xs),
+          Text('${widget.orderAmount} FCFA', style: AppTextStyles.priceAccent(size: 18)),
         ]),
         actions: [
-          ElevatedButton(
+          PremiumButton(
+            label: AppLocalizations.of(context).greatThanks,
+            height: 48,
             onPressed: () {
               Navigator.pop(context);
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14))),
-            child: Text(AppLocalizations.of(context).greatThanks,
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
+
+  static final _confettiSpecs = List.generate(8, (i) {
+    final angle = (i / 8) * 2 * pi;
+    return _ConfettiSpec(
+      emoji: const ['🎊', '✨', '🎉', '⭐'][i % 4],
+      dx: cos(angle) * 70,
+      dy: sin(angle) * 70 - 10,
+      delay: Duration(milliseconds: 100 + i * 30),
+    );
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -428,7 +499,6 @@ class _TrackingPageState extends State<TrackingPage>
     } else {
       stepKey = _status;
     }
-    final stepIdx = _statusSteps.indexOf(stepKey);
 
     final initialCam = CameraPosition(
       target: _clientPos ?? _restaurantPos ?? _cotonou,
@@ -437,10 +507,7 @@ class _TrackingPageState extends State<TrackingPage>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(t.liveTracking,
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        title: Text(t.liveTracking, style: const TextStyle(fontWeight: FontWeight.bold)),
         elevation: 0,
         actions: [
           Container(
@@ -469,7 +536,7 @@ class _TrackingPageState extends State<TrackingPage>
         // Carte Google Maps
         GoogleMap(
           initialCameraPosition: initialCam,
-          markers: _markers,
+          markers: {..._markers, if (_driverMarker != null) _driverMarker!},
           polylines: _polylines,
           onMapCreated: (ctrl) {
             _mapCtrl = ctrl;
@@ -611,7 +678,7 @@ class _TrackingPageState extends State<TrackingPage>
                 const SizedBox(height: 12),
 
                 // Stepper
-                _StatusStepper(currentStep: stepIdx < 0 ? 0 : stepIdx),
+                OrderStatusBar(steps: _statusBarSteps, currentKey: stepKey),
                 const SizedBox(height: 16),
 
                 // Infos livreur + véhicule
@@ -913,65 +980,3 @@ class _PayRow extends StatelessWidget {
       );
 }
 
-// Stepper statut
-class _StatusStepper extends StatelessWidget {
-  final int currentStep;
-  const _StatusStepper({required this.currentStep});
-
-  static const _steps = [
-    {'label': 'Reéue', 'icon': Icons.receipt_outlined},
-    {'label': 'Confirmée', 'icon': Icons.check_circle_outline},
-    {'label': 'En route', 'icon': Icons.delivery_dining},
-    {'label': 'Livrée', 'icon': Icons.celebration},
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: List.generate(_steps.length * 2 - 1, (i) {
-        if (i.isOdd) {
-          final idx = i ~/ 2;
-          return Expanded(
-              child: Container(
-                  height: 2,
-                  color: idx < currentStep
-                      ? Colors.orange
-                      : Colors.grey.shade200));
-        }
-        final idx = i ~/ 2;
-        final done = idx <= currentStep;
-        final active = idx == currentStep;
-        final color = done ? Colors.orange : Colors.grey.shade300;
-
-        return Column(mainAxisSize: MainAxisSize.min, children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 400),
-            width: active ? 40 : 32,
-            height: active ? 40 : 32,
-            decoration: BoxDecoration(
-                color: done ? color : Colors.grey.shade100,
-                shape: BoxShape.circle,
-                border: Border.all(color: color, width: active ? 2 : 1),
-                boxShadow: active
-                    ? [
-                        BoxShadow(
-                            color: Colors.orange.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                            spreadRadius: 2)
-                      ]
-                    : []),
-            child: Icon(_steps[idx]['icon'] as IconData,
-                color: done ? Colors.white : Colors.grey.shade400,
-                size: active ? 20 : 16),
-          ),
-          const SizedBox(height: 4),
-          Text(_steps[idx]['label'] as String,
-              style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                  color: done ? Colors.orange : Colors.grey)),
-        ]);
-      }),
-    );
-  }
-}

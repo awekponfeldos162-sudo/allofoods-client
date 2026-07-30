@@ -1,5 +1,5 @@
 // lib/pages/LoyaltyPage.dart
-// Programme de fidélité é points gagnés sur chaque commande
+// Programme de fidélité — points gagnés sur chaque commande
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -206,25 +206,25 @@ class _Reward {
     _Reward(
         title: '-500 FCFA',
         desc: 'Sur votre prochaine commande',
-        icon: '??',
+        icon: '🎫',
         pointsCost: 100,
         discountFcfa: 500),
     _Reward(
         title: '-1 000 FCFA',
         desc: 'Sur une commande +3 000 FCFA',
-        icon: '??',
+        icon: '🎁',
         pointsCost: 200,
         discountFcfa: 1000),
     _Reward(
         title: 'Livraison gratuite',
         desc: 'Frais de livraison offerts',
-        icon: '??',
+        icon: '🛵',
         pointsCost: 150,
         discountFcfa: 0),
     _Reward(
         title: '-2 500 FCFA',
         desc: 'Sur une commande +8 000 FCFA',
-        icon: '??',
+        icon: '💎',
         pointsCost: 500,
         discountFcfa: 2500),
   ];
@@ -404,10 +404,10 @@ class _InfoCard extends StatelessWidget {
                   color: Colors.orange)),
         ]),
         const SizedBox(height: 10),
-        _InfoRow('??', 'Passez une commande', '1 pt par 100 FCFA'),
-        _InfoRow('?', 'Laissez un avis', '+10 pts bonus'),
-        _InfoRow('??', 'Parrainez un ami', '+50 pts bonus'),
-        _InfoRow('??', 'Anniversaire', '+100 pts offerts'),
+        _InfoRow('🛒', 'Passez une commande', '1 pt par 100 FCFA'),
+        _InfoRow('⭐', 'Laissez un avis', '+10 pts bonus'),
+        _InfoRow('🤝', 'Parrainez un ami', '+50 pts bonus'),
+        _InfoRow('🎂', 'Anniversaire', '+100 pts offerts'),
       ]),
     );
   }

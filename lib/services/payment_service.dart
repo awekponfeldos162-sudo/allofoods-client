@@ -1,35 +1,36 @@
 // lib/services/payment_service.dart
 // Nouveau modèle financier allofoods :
-//   com1 = food é 5%  ? déduit du restaurant
-//   com2 = food é 5%  ? ajouté au client (frais de service)
+//   com1 = food × 5%  — déduit du restaurant
+//   com2 = food × 5%  — ajouté au client (frais de service)
 //   totalClient = food + com2 + delivery
 //   restoReceives = food - com1
 //   allofoodsTotal = com1 + com2 + delivery
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_application_2/config/env_config.dart';
 
 // CONSTANTES COMMISSION
 class PaymentService {
-  // Taux commission cété restaurant (com1) et cété client (com2)
+  // Taux commission côté restaurant (com1) et côté client (com2)
   static const double commissionRate = 0.05;
 
   static double get fedaPayRate => Env.fedaPayRate;
 
-  // Calcule les frais de service ajoutés au client (com2 = food é 5%)
+  // Calcule les frais de service ajoutés au client (com2 = food × 5%)
   static int computeServiceFee(int foodAmount) =>
       (foodAmount * commissionRate).round();
 
-  // Calcule la commission déduite du restaurant (com1 = food é 5%)
+  // Calcule la commission déduite du restaurant (com1 = food × 5%)
   static int computeCommission(int foodAmount) =>
       (foodAmount * commissionRate).round();
 
   /// Ventilation complète du nouveau modèle :
   ///   food        = prix des plats (fixé par le restaurant)
-  ///   commission  = food é 5% (com1, déduit du restaurant)
-  ///   serviceFee  = food é 5% (com2, ajouté au client)
+  ///   commission  = food × 5% (com1, déduit du restaurant)
+  ///   serviceFee  = food × 5% (com2, ajouté au client)
   ///   delivery    = frais de livraison
   ///   totalClient = food + serviceFee + delivery
   ///   restoAmount = food - commission
@@ -46,32 +47,35 @@ class PaymentService {
 
     return {
       'foodAmount': foodAmount,
-      'commission': commission, // com1 é déduit du restaurant
-      'serviceFee': serviceFee, // com2 é payé par le client
+      'commission': commission, // com1 — déduit du restaurant
+      'serviceFee': serviceFee, // com2 — payé par le client
       'deliveryFee': deliveryFee,
       'totalClient': totalClient,
-      'restoAmount': restoAmount, // ce que le restaurant reéoit
+      'restoAmount': restoAmount, // ce que le restaurant reçoit
       'alloAmount': alloAmount, // ce qu'allofoods garde
     };
   }
 
-  // Confirmer le paiement dans Firestore
+  // Confirmer le paiement — délègue à la Cloud Function `confirmOrderPayment`
+  // qui revérifie le statut auprès de FedaPay avant d'écrire Firestore.
+  // Le client ne peut plus marquer une commande PAID directement (voir
+  // firestore.rules) : c'est la seule voie légitime.
+  //
+  // [functions] est injectable pour les tests (mock de FirebaseFunctions) —
+  // en production, le paramètre n'est jamais fourni et l'instance réelle est
+  // utilisée automatiquement.
   static Future<void> onPaymentSuccess({
     required String orderId,
     required String txId,
     required int foodAmount,
     required int deliveryFee,
+    FirebaseFunctions? functions,
   }) async {
-    final v =
-        calculerVentilation(foodAmount: foodAmount, deliveryFee: deliveryFee);
-    await FirebaseFirestore.instance.collection('orders').doc(orderId).update({
-      'paymentStatus': 'PAID',
+    final callable = (functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1'))
+        .httpsCallable('confirmOrderPayment');
+    await callable.call({
+      'orderId': orderId,
       'transactionId': txId,
-      'status': 'paid',
-      'paidAt': FieldValue.serverTimestamp(),
-      'ventilation': v,
-      'restoAmount': v['restoAmount'],
-      'alloAmount': v['alloAmount'],
     });
   }
 
@@ -111,7 +115,7 @@ class PaymentService {
   }
 }
 
-// WIDGET é Récapitulatif ventilation client
+// WIDGET — Récapitulatif ventilation client
 class VentilationSummary extends StatelessWidget {
   final int foodAmount;
   final int deliveryFee;

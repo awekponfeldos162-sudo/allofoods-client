@@ -35,7 +35,7 @@ class _PromoPageState extends State<PromoPage> {
     try {
       final snap = await FirebaseFirestore.instance
           .collection('restaurants')
-          .where('isActive', isEqualTo: true)
+          .where('is_approved', isEqualTo: true)
           .where('hasActivePromo', isEqualTo: true)
           .get();
       final list = snap.docs

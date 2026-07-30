@@ -1,5 +1,5 @@
 // lib/services/storage_service.dart
-// Upload photos vers Supabase Storage (HTTP direct é contourne le SDK)
+// Upload photos vers Supabase Storage (HTTP direct — contourne le SDK)
 // Buckets : Profils | Logos | Aliments
 
 import 'dart:convert';
@@ -16,7 +16,7 @@ class StorageService {
   static String get _baseUrl => '${Env.supabaseUrl}/storage/v1/object';
   static String get _anonKey => Env.supabaseAnonKey;
 
-  // UPLOAD DEPUIS BYTES é HTTP direct, compatible partout
+  // UPLOAD DEPUIS BYTES — HTTP direct, compatible partout
   static Future<String?> uploadBytes(
     Uint8List bytes, {
     required String bucket,
@@ -50,7 +50,7 @@ class StorageService {
     }
   }
 
-  // UPLOAD DEPUIS Uint8List é profils utilisateurs
+  // UPLOAD DEPUIS Uint8List — profils utilisateurs
   // Appelé avec: await xfile.readAsBytes()
   static Future<String?> uploadImage(
     Uint8List bytes, {

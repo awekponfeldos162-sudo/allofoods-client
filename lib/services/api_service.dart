@@ -1,5 +1,5 @@
 // lib/services/api_service.dart
-// ? 100% Firebase é storage photos via Supabase
+// ✓ 100% Firebase — storage photos via Supabase
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -92,7 +92,7 @@ class ApiService {
 
   static bool isLoggedIn() => _auth.currentUser != null;
 
-  // RESTAURANTS é Firestore collection 'restaurants'
+  // RESTAURANTS — Firestore collection 'restaurants'
 
   static Future<List<dynamic>> getRestaurants({String? search}) async {
     try {
@@ -102,7 +102,7 @@ class ApiService {
         final data = d.data() as Map<String, dynamic>;
         return {'id': d.id, ...data};
       }).toList();
-      // Filtre recherche cété client
+      // Filtre recherche côté client
       if (search != null && search.isNotEmpty) {
         final lower = search.toLowerCase();
         return list.where((r) {
@@ -135,7 +135,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getRestaurant(String id) =>
       getRestaurantById(id);
 
-  // COMMANDES é Firestore collection 'orders'
+  // COMMANDES — Firestore collection 'orders'
 
   static Future<Map<String, dynamic>> createOrder({
     required String restaurantId,
@@ -226,7 +226,7 @@ class ApiService {
     }
   }
 
-  // PAIEMENTS é stockés dans la commande Firestore
+  // PAIEMENTS — stockés dans la commande Firestore
 
   static Future<Map<String, dynamic>> savePayment({
     required String orderId,
@@ -277,7 +277,7 @@ class ApiService {
     }
   }
 
-  // PHOTO DE PROFIL é Supabase Storage
+  // PHOTO DE PROFIL — Supabase Storage
 
   static Future<Map<String, dynamic>> updateProfileImage(
       String base64Img) async {
@@ -319,7 +319,7 @@ class ApiService {
     }
   }
 
-  // NOTIFICATIONS é Firestore subcollection
+  // NOTIFICATIONS — Firestore subcollection
 
   static Future<List<dynamic>> getNotifications() async {
     try {
@@ -373,12 +373,12 @@ class ApiService {
     } catch (_) {}
   }
 
-  // HELPER é messages d'erreur Firebase en français
+  // HELPER — messages d'erreur Firebase en français
   static String _authError(String code) => switch (code) {
         'user-not-found' => 'Aucun compte avec cet email.',
         'wrong-password' => 'Mot de passe incorrect.',
         'email-already-in-use' => 'Cet email est déjà utilisé.',
-        'weak-password' => 'Mot de passe trop faible (min 6 caractéres).',
+        'weak-password' => 'Mot de passe trop faible (min 6 caractères).',
         'invalid-email' => 'Adresse email invalide.',
         'user-disabled' => 'Ce compte a été désactivé.',
         'too-many-requests' => 'Trop de tentatives. Réessayez plus tard.',

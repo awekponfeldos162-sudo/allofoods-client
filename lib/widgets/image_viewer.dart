@@ -149,7 +149,7 @@ class _ImageViewerPageState extends State<_ImageViewerPage>
   @override
   void initState() {
     super.initState();
-    // Animation zoom à l'ouverture é effet vif
+    // Animation zoom à l'ouverture — effet vif
     _scaleCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 350),

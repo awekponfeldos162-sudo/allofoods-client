@@ -298,7 +298,7 @@ class _WaitingPageState extends State<WaitingPage>
   }
 }
 
-// VUE GéNéRIQUE é statut intermédiaire avec loader amélioré
+// VUE GÉNÉRIQUE — statut intermédiaire avec loader amélioré
 class _StatusView extends StatelessWidget {
   final IconData icon;
   final Color color;
@@ -405,7 +405,7 @@ class _StatusView extends StatelessWidget {
   }
 }
 
-// WIDGET é 3 points animés (loader élégant)
+// WIDGET — 3 points animés (loader élégant)
 class _AnimatedDots extends StatefulWidget {
   final Color color;
   const _AnimatedDots({this.color = Colors.orange});

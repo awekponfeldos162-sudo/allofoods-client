@@ -1,4 +1,4 @@
-﻿// lib/main.dart é allofoods + FCM intégré
+// lib/main.dart — allofoods + FCM intégré
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -39,6 +39,8 @@ import 'l10n/app_localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_maps_flutter_android/google_maps_flutter_android.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'theme/app_theme.dart';
 final _appNavKey = GlobalKey<NavigatorState>();
 
 // Handler FCM background — DOIT être top-level, exécuté quand app est fermée/arrière-plan
@@ -170,7 +172,7 @@ class allofoodsApp extends StatelessWidget {
     final theme = context.watch<ThemeProvider>();
 
     return MaterialApp(
-      title: 'allofoods',
+      title: 'AlloFoods',
       debugShowCheckedModeBanner: false,
       locale: lang.locale,
       themeMode: theme.mode,
@@ -182,74 +184,8 @@ class allofoodsApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.orange),
-        scaffoldBackgroundColor: Colors.white,
-        useMaterial3: true,
-        fontFamily: 'Poppins',
-        // Transitions style iOS sur Android et iOS
-        pageTransitionsTheme: const PageTransitionsTheme(
-          builders: {
-            TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-            TargetPlatform.windows: OpenUpwardsPageTransitionsBuilder(),
-            TargetPlatform.linux: OpenUpwardsPageTransitionsBuilder(),
-            TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-          },
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.orange,
-          elevation: 0,
-          centerTitle: true,
-          titleTextStyle: TextStyle(
-            fontFamily: 'Poppins',
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            color: Color(0xFF1A1A1A),
-          ),
-        ),
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.orange, brightness: Brightness.dark),
-        useMaterial3: true,
-        fontFamily: 'Poppins',
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        cardColor: const Color(0xFF1E1E1E),
-        pageTransitionsTheme: const PageTransitionsTheme(
-          builders: {
-            TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-            TargetPlatform.windows: OpenUpwardsPageTransitionsBuilder(),
-            TargetPlatform.linux: OpenUpwardsPageTransitionsBuilder(),
-            TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-          },
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF1A1A1A),
-          foregroundColor: Colors.orange,
-          elevation: 0,
-          centerTitle: true,
-          titleTextStyle: TextStyle(
-            fontFamily: 'Poppins',
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            color: Colors.orange,
-          ),
-        ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Color(0xFF1A1A1A),
-          selectedItemColor: Colors.orange,
-          unselectedItemColor: Colors.grey,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.grey.shade50,
-          labelStyle: TextStyle(color: Colors.grey.shade600),
-          hintStyle: TextStyle(color: Colors.grey.shade400),
-        ),
-      ),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
       navigatorKey: _appNavKey,
       builder: (context, child) => Stack(
         children: [
@@ -274,38 +210,55 @@ class allofoodsApp extends StatelessWidget {
 // SPLASH SCREEN — affiché pendant Firebase auth + Firestore user doc
 class _SplashScreen extends StatelessWidget {
   const _SplashScreen();
+
   @override
-  Widget build(BuildContext context) => const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.fastfood, color: Colors.orange, size: 64),
-              SizedBox(height: 16),
-              Text(
-                'allofoods',
-                style: TextStyle(
-                  color: Color(0xFF1A1A1A),
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Poppins',
-                  letterSpacing: 1,
-                ),
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
               ),
-              SizedBox(height: 32),
-              SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: Colors.orange,
-                ),
-              ),
-            ],
-          ),
+              child: const Icon(Icons.fastfood_rounded, color: AppColors.accent, size: 56),
+            )
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .scaleXY(end: 1.08, duration: 900.ms, curve: Curves.easeInOut),
+            const SizedBox(height: AppSpacing.lg),
+            Text('allofoods', style: AppTextStyles.textTheme(brightness).displaySmall)
+                .animate()
+                .fadeIn(duration: 400.ms)
+                .slideY(begin: 0.15, end: 0),
+            const SizedBox(height: AppSpacing.xl),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(3, (i) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
+                  )
+                      .animate(onPlay: (c) => c.repeat())
+                      .fadeIn(duration: 400.ms, delay: (i * 150).ms)
+                      .then()
+                      .fadeOut(duration: 400.ms),
+                );
+              }),
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
 }
 
 // AUTH GATE  avec initialisation FCM
@@ -363,7 +316,7 @@ class _AuthGateState extends State<AuthGate> {
   }
 }
 
-// MAIN SCAFFOLD é avec écoute FCM foreground
+// MAIN SCAFFOLD — avec écoute FCM foreground
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});
   @override
@@ -1079,4 +1032,4 @@ class _ActiveOrderFABState extends State<_ActiveOrderFAB>
   }
 }
 
-// SPLASH VIDéO é animation .webm plein écran
+// SPLASH VIDÉO — animation .webm plein écran

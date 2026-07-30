@@ -607,7 +607,7 @@ class _PhoneField extends StatelessWidget {
       if (error == null)
         Padding(
           padding: const EdgeInsets.only(left: 12, top: 4),
-          child: Text('Format : 01 XX XX XX XX (10 chiffres)',
+          child: Text('Format : 01 XX XX XX XX (8 chiffres après le 01)',
               style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
         ),
     ]);

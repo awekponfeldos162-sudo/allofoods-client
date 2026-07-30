@@ -1,5 +1,5 @@
 // lib/providers/language_provider.dart
-// ? Firebase : pas de changement é SharedPreferences pour la langue, c'est correct
+// ✓ Firebase : pas de changement — SharedPreferences pour la langue, c'est correct
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';

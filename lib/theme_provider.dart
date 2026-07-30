@@ -1,5 +1,5 @@
 // lib/providers/theme_provider.dart
-// ? Mode sombre é connecté au MaterialApp via ThemeMode
+// ✓ Mode sombre — connecté au MaterialApp via ThemeMode
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';

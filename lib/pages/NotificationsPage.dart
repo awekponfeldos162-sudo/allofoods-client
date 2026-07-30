@@ -1,5 +1,5 @@
 // lib/pages/NotificationsPage.dart
-// ? Firestore temps réel é users/{uid}/notifications
+// ✓ Firestore temps réel — users/{uid}/notifications
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';

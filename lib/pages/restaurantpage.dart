@@ -63,9 +63,10 @@ class _RestaurantPageState extends State<RestaurantPage> {
   Future<void> _loadRestaurants() async {
     if (mounted) setState(() => _loading = true);
     try {
+      // Tous les restaurants approuvés — ouverts ou fermés restent visibles.
       final snap = await FirebaseFirestore.instance
           .collection('restaurants')
-          .where('isActive', isEqualTo: true)
+          .where('is_approved', isEqualTo: true)
           .get();
       final list = snap.docs
           .map((d) {
@@ -106,7 +107,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
         copy.sort((a, b) => a.deliveryTime.compareTo(b.deliveryTime));
         break;
       default:
-        break; // 'Distance' é pas de coordonnées, ordre original conservé
+        break; // 'Distance' — pas de coordonnées, ordre original conservé
     }
     return copy;
   }

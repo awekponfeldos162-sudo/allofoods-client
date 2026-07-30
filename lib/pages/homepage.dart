@@ -1,14 +1,17 @@
 // lib/pages/homepage.dart
-// Accueil allofoods é restaurants Firestore + localisation + recherche + avatar
+// Accueil allofoods — restaurants Firestore + localisation + recherche + avatar
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_application_2/favorites_provider.dart';
 import 'package:provider/provider.dart';
 import '../models/restaurant_model.dart';
+import '../theme/app_theme.dart';
+import '../widgets/premium/premium.dart';
 import 'RestaurantProfilPage.dart';
 import 'adressePage.dart';
 import 'restaurantpage.dart';
@@ -48,14 +51,18 @@ class _HomepageState extends State<Homepage> {
     _load();
   }
 
+  // ── Logique de données — inchangée ──────────────────────────────
   Future<void> _load() async {
     if (!mounted) return;
     setState(() => _loading = true);
 
     try {
+      // Tous les restaurants approuvés — ouverts ou fermés (les fermés
+      // restent visibles/explorables, juste non commandables, voir
+      // RestaurantProfilPage / PanierPage).
       final snap = await FirebaseFirestore.instance
           .collection('restaurants')
-          .where('isActive', isEqualTo: true)
+          .where('is_approved', isEqualTo: true)
           .get()
           .timeout(const Duration(seconds: 10));
 
@@ -101,8 +108,9 @@ class _HomepageState extends State<Homepage> {
       explore = all.length > 5 ? all.sublist(5) : [];
     } else {
       if (featured.isEmpty) featured = all.take(2).toList();
-      if (daily.isEmpty && all.length > 2)
+      if (daily.isEmpty && all.length > 2) {
         daily = all.sublist(2, (all.length > 5 ? 5 : all.length));
+      }
       if (explore.isEmpty && all.length > 5) explore = all.sublist(5);
     }
 
@@ -160,16 +168,14 @@ class _HomepageState extends State<Homepage> {
     );
   }
 
+  // ── UI ────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF121212) : Colors.white;
+    final brightness = Theme.of(context).brightness;
+    final bg = brightness == Brightness.dark ? AppColors.backgroundDark : AppColors.backgroundLight;
 
     if (_loading) {
-      return Container(
-          color: bg,
-          child: const Center(
-              child: CircularProgressIndicator(color: Colors.orange)));
+      return Container(color: bg, child: const _HomeSkeleton());
     }
 
     final proches = _allRestaurants.take(8).toList();
@@ -178,16 +184,15 @@ class _HomepageState extends State<Homepage> {
     return Container(
       color: bg,
       child: RefreshIndicator(
-        color: Colors.orange,
+        color: AppColors.accent,
         onRefresh: _load,
         child: ListView(
           padding: const EdgeInsets.only(bottom: 30),
           children: [
-            _LocationBar(isDark: isDark),
-            _SearchBar(isDark: isDark),
+            const _LocationBar(),
+            const _SearchBar(),
             _CategoryFilter(
               selected: _selectedCategory,
-              isDark: isDark,
               onSelect: (cat) {
                 if (_selectedCategory == cat) return;
                 setState(() => _selectedCategory = cat);
@@ -249,22 +254,7 @@ class _HomepageState extends State<Homepage> {
               _SeeMoreBtn(onTap: _goToRestaurants),
             ],
 
-            if (_allRestaurants.isEmpty)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(40),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.restaurant, size: 60, color: Colors.orange),
-                    const SizedBox(height: 16),
-                    Text(t.noRestaurantsAvailable,
-                        style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Text(t.comeBackSoon,
-                        style: const TextStyle(color: Colors.grey)),
-                  ]),
-                ),
-              ),
+            if (_allRestaurants.isEmpty) _EmptyRestaurants(t: t),
 
             const SizedBox(height: 20),
           ],
@@ -274,42 +264,102 @@ class _HomepageState extends State<Homepage> {
   }
 }
 
-// BARRE DE LOCALISATION + AVATAR
-class _LocationBar extends StatelessWidget {
-  final bool isDark;
-  const _LocationBar({required this.isDark});
+// ── ÉTAT VIDE PREMIUM ─────────────────────────────────────────────
+class _EmptyRestaurants extends StatelessWidget {
+  final AppLocalizations t;
+  const _EmptyRestaurants({required this.t});
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTextStyles.textTheme(Theme.of(context).brightness);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.restaurant_rounded, size: 52, color: AppColors.accent),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(t.noRestaurantsAvailable, style: texts.headlineSmall, textAlign: TextAlign.center),
+          const SizedBox(height: AppSpacing.xs),
+          Text(t.comeBackSoon, style: texts.bodyMedium, textAlign: TextAlign.center),
+        ]),
+      ),
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05, end: 0);
+  }
+}
+
+// ── SKELETON DE CHARGEMENT INITIAL ────────────────────────────────
+class _HomeSkeleton extends StatelessWidget {
+  const _HomeSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: SkeletonLoader.text(width: 160, height: 42),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        SizedBox(
+          height: 212,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            itemCount: 3,
+            itemBuilder: (_, __) => Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.sm),
+              child: SizedBox(width: 170, child: SkeletonLoader.card(height: 212)),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: SkeletonLoader.list(count: 3, itemHeight: 76),
+        ),
+      ],
+    );
+  }
+}
+
+// BARRE DE LOCALISATION + AVATAR
+class _LocationBar extends StatelessWidget {
+  const _LocationBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    final cardColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final cardColor = brightness == Brightness.dark ? AppColors.surfaceDark : AppColors.surfaceLight;
 
     return Container(
       color: cardColor,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, 12, AppSpacing.md, 8),
       child: Row(children: [
-        // Zone de livraison é tap ? AdressePage
+        // Zone de livraison — tap → AdressePage
         Expanded(
           child: GestureDetector(
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const AdressePage())),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const AdressePage()));
+            },
             child: Row(children: [
-              const Icon(Icons.location_on, color: Colors.orange, size: 20),
+              const Icon(Icons.location_on_rounded, color: AppColors.accent, size: 20),
               const SizedBox(width: 6),
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(AppLocalizations.of(context).deliveryTo,
-                    style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey.shade500,
-                        fontWeight: FontWeight.w400)),
+                Text(AppLocalizations.of(context).deliveryTo, style: texts.labelSmall),
                 Row(children: [
-                  Text('Cotonou',
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black87)),
-                  const Icon(Icons.keyboard_arrow_down,
-                      size: 16, color: Colors.orange),
+                  Text('Cotonou', style: texts.titleMedium),
+                  const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.accent),
                 ]),
               ]),
             ]),
@@ -319,10 +369,7 @@ class _LocationBar extends StatelessWidget {
         // Avatar utilisateur (photo ou initiales)
         if (uid != null)
           StreamBuilder<DocumentSnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('users')
-                .doc(uid)
-                .snapshots(),
+            stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
             builder: (_, snap) {
               final data = snap.data?.data() as Map<String, dynamic>? ?? {};
               final photoUrl = (data['photoUrl'] as String?)?.isNotEmpty == true
@@ -330,30 +377,20 @@ class _LocationBar extends StatelessWidget {
                   : (data['photoURL'] as String?)?.isNotEmpty == true
                       ? data['photoURL'] as String
                       : '';
-              final name = data['displayName'] as String? ??
-                  data['name'] as String? ??
-                  '';
-              final initials = name.isNotEmpty
-                  ? name.trim().split(' ').map((w) => w[0]).take(2).join()
-                  : '?';
+              final name = data['displayName'] as String? ?? data['name'] as String? ?? '';
+              final initials =
+                  name.isNotEmpty ? name.trim().split(' ').map((w) => w[0]).take(2).join() : '?';
 
               return GestureDetector(
                 onTap: () => HapticFeedback.selectionClick(),
                 child: photoUrl.isNotEmpty
-                    ? CircleAvatar(
-                        radius: 20,
-                        backgroundImage: NetworkImage(photoUrl),
-                      )
+                    ? CircleAvatar(radius: 20, backgroundImage: NetworkImage(photoUrl))
                     : CircleAvatar(
                         radius: 20,
-                        backgroundColor: Colors.orange,
-                        child: Text(
-                          initials.toUpperCase(),
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13),
-                        ),
+                        backgroundColor: AppColors.accent,
+                        child: Text(initials.toUpperCase(),
+                            style: const TextStyle(
+                                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                       ),
               );
             },
@@ -365,33 +402,31 @@ class _LocationBar extends StatelessWidget {
 
 // BARRE DE RECHERCHE (navigation)
 class _SearchBar extends StatelessWidget {
-  final bool isDark;
-  const _SearchBar({required this.isDark});
+  const _SearchBar();
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
+    final isDark = brightness == Brightness.dark;
+
     return Container(
-      color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const RestaurantPage()));
-        },
+      color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, 12),
+      child: TapScale(
+        pressedScale: 0.985,
+        haptic: HapticFeedbackType.selection,
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RestaurantPage())),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(
-                color: isDark ? Colors.white12 : Colors.grey.shade200),
+            color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+            borderRadius: AppRadius.chipRadius,
           ),
           child: Row(children: [
-            Icon(Icons.search, color: Colors.orange, size: 20),
+            const Icon(Icons.search_rounded, color: AppColors.accent, size: 20),
             const SizedBox(width: 10),
-            Text(AppLocalizations.of(context).searchHint,
-                style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+            Text(AppLocalizations.of(context).searchHint, style: texts.bodyMedium?.copyWith(color: texts.labelMedium?.color)),
           ]),
         ),
       ),
@@ -405,31 +440,29 @@ class _Header extends StatelessWidget {
   const _Header(this.title, {this.onSeeAll});
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(title,
-                  style: const TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.bold)),
+  Widget build(BuildContext context) {
+    final texts = AppTextStyles.textTheme(Theme.of(context).brightness);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 8),
+      child: Row(
+        children: [
+          Expanded(child: Text(title, style: texts.headlineSmall)),
+          if (onSeeAll != null)
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onSeeAll!();
+              },
+              child: Row(children: [
+                Text(AppLocalizations.of(context).seeAll,
+                    style: texts.labelMedium?.copyWith(color: AppColors.accent, fontWeight: FontWeight.w600)),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.accent, size: 18),
+              ]),
             ),
-            if (onSeeAll != null)
-              GestureDetector(
-                onTap: onSeeAll,
-                child: Row(children: [
-                  Text(AppLocalizations.of(context).seeAll,
-                      style: TextStyle(
-                          color: const Color.fromARGB(255, 242, 145, 48),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600)),
-                  Icon(Icons.chevron_right,
-                      color: Colors.orange.shade600, size: 18),
-                ]),
-              ),
-          ],
-        ),
-      );
+        ],
+      ),
+    );
+  }
 }
 
 class _SeeMoreBtn extends StatelessWidget {
@@ -437,39 +470,21 @@ class _SeeMoreBtn extends StatelessWidget {
   const _SeeMoreBtn({required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 13),
-            decoration: BoxDecoration(
-              color: Colors.orange.withValues(alpha: 0.07),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                  color: Colors.orange.withValues(alpha: 0.35), width: 1.2),
-            ),
-            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(Icons.restaurant_menu,
-                  color: Colors.orange.shade700, size: 16),
-              const SizedBox(width: 8),
-              Text(AppLocalizations.of(context).seeMoreRestaurants,
-                  style: TextStyle(
-                      color: const Color.fromARGB(255, 5, 4, 3),
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      letterSpacing: 0.2)),
-              const SizedBox(width: 6),
-              Icon(Icons.arrow_forward_rounded,
-                  color: Colors.orange.shade700, size: 15),
-            ]),
-          ),
-        ),
-      );
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, 10, AppSpacing.md, 4),
+      child: PremiumButton(
+        label: AppLocalizations.of(context).seeMoreRestaurants,
+        icon: Icons.restaurant_menu_rounded,
+        outlined: true,
+        height: 48,
+        onPressed: onTap,
+      ),
+    );
+  }
 }
 
-// LISTE HORIZONTALE RESTAURANTS
+// LISTE HORIZONTALE RESTAURANTS — utilise le widget premium réutilisable
 class _HRestaurantList extends StatelessWidget {
   final List<Restaurant> items;
   final void Function(Restaurant) onTap;
@@ -480,118 +495,28 @@ class _HRestaurantList extends StatelessWidget {
         height: 212,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, 4),
           itemCount: items.length,
-          itemBuilder: (_, i) =>
-              _HRestaurantCard(r: items[i], onTap: () => onTap(items[i])),
+          itemBuilder: (_, i) {
+            final r = items[i];
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: SizedBox(
+                width: 178,
+                child: Consumer<FavoritesProvider>(
+                  builder: (_, favs, __) => AnimatedRestaurantCard(
+                    restaurant: r,
+                    imageHeight: 110,
+                    onTap: () => onTap(r),
+                    isFavorite: favs.isFavRestaurant(r.id),
+                    onToggleFavorite: () => favs.toggleRestaurant(r.id),
+                  ),
+                ),
+              ),
+            ).animate().fadeIn(duration: 300.ms, delay: (i * 60).ms).slideX(begin: 0.08, end: 0);
+          },
         ),
       );
-}
-
-// CARTE RESTAURANT HORIZONTALE
-class _HRestaurantCard extends StatelessWidget {
-  final Restaurant r;
-  final VoidCallback onTap;
-  const _HRestaurantCard({required this.r, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Consumer<FavoritesProvider>(
-      builder: (_, favs, __) {
-        final isFav = favs.isFavRestaurant(r.id);
-        return GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: 160,
-            margin: const EdgeInsets.only(right: 12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.07),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3))
-              ],
-            ),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
-                child: Stack(children: [
-                  _Img(img: r.coverImg, width: 160, height: 100),
-                  Positioned(
-                    top: 6,
-                    left: 6,
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _OpenBadge(isOpen: r.isCurrentlyOpen),
-                          if (r.hasActivePromo) ...[
-                            const SizedBox(height: 3),
-                            const _PromoBadge(),
-                          ],
-                        ]),
-                  ),
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: GestureDetector(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        favs.toggleRestaurant(r.id);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.35),
-                            shape: BoxShape.circle),
-                        child: Icon(
-                            isFav ? Icons.favorite : Icons.favorite_border,
-                            color: isFav ? Colors.red : Colors.white,
-                            size: 14),
-                      ),
-                    ),
-                  ),
-                ]),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(r.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 13)),
-                      const SizedBox(height: 2),
-                      Text(r.style,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: Colors.orange.shade600, fontSize: 11)),
-                      const SizedBox(height: 5),
-                      Row(children: [
-                        const Icon(Icons.star, size: 12, color: Colors.amber),
-                        Text(' ${r.rating.toStringAsFixed(1)}',
-                            style: const TextStyle(fontSize: 11)),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.timer, size: 12, color: Colors.grey),
-                        Text(' ${r.deliveryTime}m',
-                            style: const TextStyle(
-                                fontSize: 11, color: Colors.grey)),
-                      ]),
-                    ]),
-              ),
-            ]),
-          ),
-        );
-      },
-    );
-  }
 }
 
 // LISTE HORIZONTALE PLATS
@@ -605,10 +530,12 @@ class _HPlatList extends StatelessWidget {
         height: 205,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, 4),
           itemCount: items.length,
-          itemBuilder: (_, i) =>
-              _HPlatCard(item: items[i], onTap: () => onTap(items[i])),
+          itemBuilder: (_, i) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: _HPlatCard(item: items[i], onTap: () => onTap(items[i])),
+          ).animate().fadeIn(duration: 300.ms, delay: (i * 60).ms).slideX(begin: 0.08, end: 0),
         ),
       );
 }
@@ -621,56 +548,35 @@ class _HPlatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
     final plat = item.plat;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 150,
-        margin: const EdgeInsets.only(right: 12),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.07),
-                blurRadius: 8,
-                offset: const Offset(0, 3))
-          ],
-        ),
+
+    return SizedBox(
+      width: 150,
+      child: PremiumCard(
+        onTap: onTap,
+        padding: EdgeInsets.zero,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
             child: _Img(img: plat.img, width: 150, height: 95),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(plat.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 13)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(plat.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: texts.titleSmall),
               const SizedBox(height: 2),
-              Text(item.restaurant.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
+              Text(item.restaurant.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: texts.bodySmall),
               const SizedBox(height: 6),
               Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                 Expanded(
-                  child: Text('${plat.priceInt} F',
-                      style: const TextStyle(
-                          color: Colors.orange,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13)),
+                  child: Text('${plat.priceInt} F', style: AppTextStyles.priceAccent(size: 13)),
                 ),
                 Consumer<CartProvider>(
                   builder: (_, cart, __) {
-                    final inCart = cart.items.any((i) =>
-                        i.name == plat.name &&
-                        i.restaurantId == item.restaurant.id);
+                    final inCart = cart.items
+                        .any((i) => i.name == plat.name && i.restaurantId == item.restaurant.id);
                     return GestureDetector(
                       onTap: () {
                         HapticFeedback.lightImpact();
@@ -683,15 +589,18 @@ class _HPlatCard extends StatelessWidget {
                         );
                       },
                       child: Container(
-                        width: 24,
-                        height: 24,
+                        width: 26,
+                        height: 26,
                         decoration: BoxDecoration(
-                            color: inCart
-                                ? const Color.fromARGB(255, 242, 170, 4)
-                                : Colors.orange,
-                            shape: BoxShape.circle),
-                        child: Icon(inCart ? Icons.check : Icons.add,
-                            color: Colors.white, size: 14),
+                          color: inCart ? AppColors.success : AppColors.accent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(inCart ? Icons.check_rounded : Icons.add_rounded,
+                                color: Colors.white, size: 15)
+                            .animate(target: inCart ? 1 : 0)
+                            .scaleXY(end: 1.15, duration: 150.ms)
+                            .then()
+                            .scaleXY(end: 1, duration: 100.ms),
                       ),
                     );
                   },
@@ -705,7 +614,7 @@ class _HPlatCard extends StatelessWidget {
   }
 }
 
-// CAROUSEL
+// CAROUSEL BANNIÈRE
 class _Carousel extends StatefulWidget {
   final List<Restaurant> items;
   final void Function(Restaurant) onTap;
@@ -726,9 +635,7 @@ class _CarouselState extends State<_Carousel> {
       _timer = Timer.periodic(const Duration(seconds: 4), (_) {
         if (!mounted) return;
         final next = (_page + 1) % widget.items.length;
-        _ctrl.animateToPage(next,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeInOut);
+        _ctrl.animateToPage(next, duration: const Duration(milliseconds: 200), curve: Curves.easeInOut);
       });
     }
   }
@@ -742,6 +649,7 @@ class _CarouselState extends State<_Carousel> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     return Column(children: [
       SizedBox(
         height: 200,
@@ -754,37 +662,27 @@ class _CarouselState extends State<_Carousel> {
             return Consumer<FavoritesProvider>(
               builder: (_, favs, __) {
                 final isFav = favs.isFavRestaurant(r.id);
-                return GestureDetector(
+                return TapScale(
                   onTap: () => widget.onTap(r),
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 6),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4))
-                      ],
+                      borderRadius: AppRadius.cardRadius,
+                      boxShadow: AppShadows.medium(brightness),
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: AppRadius.cardRadius,
                       child: Stack(children: [
-                        _Img(
-                            img: r.coverImg,
-                            width: double.infinity,
-                            height: 200),
-                        Container(
-                            decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                            colors: [
-                              Colors.black.withValues(alpha: 0.75),
-                              Colors.transparent
-                            ],
+                        _Img(img: r.coverImg, width: double.infinity, height: 200),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                              colors: [AppColors.imageOverlay.withValues(alpha: 0.75), Colors.transparent],
+                            ),
                           ),
-                        )),
+                        ),
                         Positioned(
                           top: 10,
                           right: 10,
@@ -796,62 +694,38 @@ class _CarouselState extends State<_Carousel> {
                             child: Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.35),
-                                  shape: BoxShape.circle),
-                              child: Icon(
-                                  isFav
-                                      ? Icons.favorite
-                                      : Icons.favorite_border,
-                                  color: isFav ? Colors.red : Colors.white,
-                                  size: 18),
+                                  color: AppColors.imageOverlay.withValues(alpha: 0.35), shape: BoxShape.circle),
+                              child: Icon(isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                  color: isFav ? AppColors.error : Colors.white, size: 18),
                             ),
                           ),
                         ),
                         Positioned(
                           top: 10,
                           left: 10,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _OpenBadge(isOpen: r.isCurrentlyOpen),
-                              if (r.hasActivePromo) ...[
-                                const SizedBox(height: 4),
-                                const _PromoBadge(),
-                              ],
-                            ],
-                          ),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            _OpenBadge(isOpen: r.isActive),
+                            if (r.hasActivePromo) ...[const SizedBox(height: 4), const _PromoBadge()],
+                          ]),
                         ),
                         Positioned(
                           bottom: 14,
                           left: 14,
                           right: 14,
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(r.name,
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 17)),
-                                Text(r.style,
-                                    style: const TextStyle(
-                                        color: Colors.orangeAccent,
-                                        fontSize: 12)),
-                                const SizedBox(height: 4),
-                                Row(children: [
-                                  const Icon(Icons.star,
-                                      size: 12, color: Colors.amber),
-                                  Text(' ${r.rating.toStringAsFixed(1)}',
-                                      style: const TextStyle(
-                                          color: Colors.white70, fontSize: 11)),
-                                  const SizedBox(width: 10),
-                                  const Icon(Icons.timer,
-                                      size: 12, color: Colors.white70),
-                                  Text(' ${r.deliveryTime} min',
-                                      style: const TextStyle(
-                                          color: Colors.white70, fontSize: 11)),
-                                ]),
-                              ]),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(r.name,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
+                            Text(r.style, style: const TextStyle(color: Color(0xFFFFCC99), fontSize: 12)),
+                            const SizedBox(height: 4),
+                            Row(children: [
+                              const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFFB020)),
+                              Text(' ${r.rating.toStringAsFixed(1)}',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                              const SizedBox(width: 10),
+                              const Icon(Icons.timer_rounded, size: 12, color: Colors.white70),
+                              Text(' ${r.deliveryTime} min', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                            ]),
+                          ]),
                         ),
                       ]),
                     ),
@@ -866,17 +740,18 @@ class _CarouselState extends State<_Carousel> {
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(
-            widget.items.length,
-            (i) => AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  width: _page == i ? 18 : 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    color: _page == i ? Colors.orange : Colors.orange.shade200,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                )),
+          widget.items.length,
+          (i) => AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            width: _page == i ? 18 : 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: _page == i ? AppColors.accent : AppColors.accent.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ),
       ),
     ]);
   }
@@ -890,9 +765,10 @@ class _Grid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -908,105 +784,64 @@ class _Grid extends StatelessWidget {
           return Consumer<FavoritesProvider>(
             builder: (_, favs, __) {
               final isFav = favs.isFavRestaurant(r.id);
-              return GestureDetector(
+              return (PremiumCard(
                 onTap: () => onTap(r),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.07),
-                          blurRadius: 6,
-                          offset: const Offset(0, 3))
-                    ],
-                  ),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(14)),
-                          child: Stack(children: [
-                            _Img(
-                                img: r.coverImg,
-                                width: double.infinity,
-                                height: 105),
-                            Positioned(
-                              top: 6,
-                              left: 6,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _OpenBadge(isOpen: r.isCurrentlyOpen),
-                                  if (r.hasActivePromo) ...[
-                                    const SizedBox(height: 3),
-                                    const _PromoBadge(),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            Positioned(
-                              top: 6,
-                              right: 6,
-                              child: GestureDetector(
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  favs.toggleRestaurant(r.id);
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(5),
-                                  decoration: BoxDecoration(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.35),
-                                      shape: BoxShape.circle),
-                                  child: Icon(
-                                      isFav
-                                          ? Icons.favorite
-                                          : Icons.favorite_border,
-                                      color: isFav ? Colors.red : Colors.white,
-                                      size: 14),
-                                ),
-                              ),
-                            ),
+                padding: EdgeInsets.zero,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
+                      child: Stack(fit: StackFit.expand, children: [
+                        _Img(img: r.coverImg, width: double.infinity, height: 105),
+                        Positioned(
+                          top: 6,
+                          left: 6,
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            _OpenBadge(isOpen: r.isActive),
+                            if (r.hasActivePromo) ...[const SizedBox(height: 3), const _PromoBadge()],
                           ]),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(r.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13)),
-                                const SizedBox(height: 2),
-                                Text(r.style,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                        color: Colors.orange.shade600,
-                                        fontSize: 11)),
-                                const SizedBox(height: 6),
-                                Row(children: [
-                                  const Icon(Icons.star,
-                                      size: 12, color: Colors.amber),
-                                  Text(' ${r.rating.toStringAsFixed(1)}',
-                                      style: const TextStyle(fontSize: 11)),
-                                  const Spacer(),
-                                  const Icon(Icons.timer,
-                                      size: 12, color: Colors.grey),
-                                  Text(' ${r.deliveryTime}m',
-                                      style: const TextStyle(
-                                          fontSize: 11, color: Colors.grey)),
-                                ]),
-                              ]),
+                        Positioned(
+                          top: 6,
+                          right: 6,
+                          child: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              favs.toggleRestaurant(r.id);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                  color: AppColors.imageOverlay.withValues(alpha: 0.35), shape: BoxShape.circle),
+                              child: Icon(isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                  color: isFav ? AppColors.error : Colors.white, size: 14),
+                            ),
+                          ),
                         ),
                       ]),
-                ),
-              );
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(r.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: texts.titleSmall),
+                      const SizedBox(height: 2),
+                      Text(r.style, maxLines: 1, overflow: TextOverflow.ellipsis, style: texts.bodySmall),
+                      const SizedBox(height: 6),
+                      Row(children: [
+                        const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFFB020)),
+                        Text(' ${r.rating.toStringAsFixed(1)}', style: texts.labelSmall),
+                        const Spacer(),
+                        Icon(Icons.timer_rounded, size: 12, color: texts.bodySmall?.color),
+                        Text(' ${r.deliveryTime}m', style: texts.bodySmall),
+                      ]),
+                    ]),
+                  ),
+                ]),
+              ))
+                  .animate()
+                  .fadeIn(duration: 300.ms, delay: (i * 40).ms)
+                  .slideY(begin: 0.06, end: 0);
             },
           );
         },
@@ -1022,23 +857,16 @@ class _PromoBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.red.shade500,
-          borderRadius: BorderRadius.circular(6),
-        ),
+        decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(6)),
         child: const Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.local_offer, size: 9, color: Colors.white),
+          Icon(Icons.local_offer_rounded, size: 9, color: Colors.white),
           SizedBox(width: 3),
-          Text('Promo',
-              style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white)),
+          Text('Promo', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
         ]),
       );
 }
 
-// BADGE OUVERT / FERMé
+// BADGE OUVERT / FERMÉ
 class _OpenBadge extends StatelessWidget {
   final bool isOpen;
   const _OpenBadge({required this.isOpen});
@@ -1047,7 +875,7 @@ class _OpenBadge extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
         decoration: BoxDecoration(
-          color: isOpen ? Colors.green.shade100 : Colors.red.shade100,
+          color: (isOpen ? AppColors.success : AppColors.error).withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
@@ -1055,7 +883,7 @@ class _OpenBadge extends StatelessWidget {
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w600,
-            color: isOpen ? Colors.green.shade700 : Colors.red.shade700,
+            color: isOpen ? AppColors.success : AppColors.error,
           ),
         ),
       );
@@ -1064,85 +892,63 @@ class _OpenBadge extends StatelessWidget {
 // FILTRES CATÉGORIES
 class _CategoryFilter extends StatelessWidget {
   final String selected;
-  final bool isDark;
   final void Function(String) onSelect;
-  const _CategoryFilter({
-    required this.selected,
-    required this.isDark,
-    required this.onSelect,
-  });
+  const _CategoryFilter({required this.selected, required this.onSelect});
 
   static const _labels = [
-    'Tous',
-    'Burger',
-    'Pizza',
-    'Poulet',
-    'Africain',
-    'Grillades',
-    'Sandwich',
-    'Boulangerie',
+    'Tous', 'Burger', 'Pizza', 'Poulet', 'Africain', 'Grillades', 'Sandwich', 'Boulangerie',
   ];
   static const _icons = [
-    Icons.apps_rounded,
-    Icons.lunch_dining,
-    Icons.local_pizza,
-    Icons.set_meal,
-    Icons.restaurant,
-    Icons.outdoor_grill,
-    Icons.fastfood,
-    Icons.bakery_dining,
+    Icons.apps_rounded, Icons.lunch_dining_rounded, Icons.local_pizza_rounded, Icons.set_meal_rounded,
+    Icons.restaurant_rounded, Icons.outdoor_grill_rounded, Icons.fastfood_rounded, Icons.bakery_dining_rounded,
   ];
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
+
     return Container(
-      color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+      color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
       height: 60,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.sm, 8, AppSpacing.sm, 8),
         itemCount: _labels.length,
         itemBuilder: (_, i) {
           final label = _labels[i];
           final icon = _icons[i];
           final isSelected = selected == label;
-          return GestureDetector(
-            onTap: () => onSelect(label),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.only(right: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? Colors.orange
-                    : (isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: Colors.orange.withValues(alpha: 0.35),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        )
-                      ]
-                    : [],
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(icon,
-                    size: 14,
-                    color: isSelected ? Colors.white : Colors.grey.shade600),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    color: isSelected
-                        ? Colors.white
-                        : (isDark ? Colors.white70 : Colors.grey.shade700),
-                  ),
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: TapScale(
+              haptic: HapticFeedbackType.selection,
+              onTap: () => onSelect(label),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.accent
+                      : (isDark ? AppColors.backgroundDark : AppColors.backgroundLight),
+                  borderRadius: AppRadius.chipRadius,
+                  boxShadow: isSelected ? AppShadows.strong(brightness) : null,
                 ),
-              ]),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(icon, size: 14, color: isSelected ? Colors.white : AppColors.textSecondaryLight),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark ? AppColors.textSecondaryDark : AppColors.textPrimaryLight),
+                    ),
+                  ),
+                ]),
+              ),
             ),
           );
         },
@@ -1162,10 +968,12 @@ class _PromoList extends StatelessWidget {
         height: 148,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, 4),
           itemCount: items.length,
-          itemBuilder: (_, i) =>
-              _PromoCard(r: items[i], onTap: () => onTap(items[i])),
+          itemBuilder: (_, i) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: _PromoCard(r: items[i], onTap: () => onTap(items[i])),
+          ).animate().fadeIn(duration: 300.ms, delay: (i * 60).ms).slideX(begin: 0.08, end: 0),
         ),
       );
 }
@@ -1177,98 +985,65 @@ class _PromoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final brightness = Theme.of(context).brightness;
+    return TapScale(
       onTap: onTap,
       child: Container(
         width: 290,
-        margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.red.withValues(alpha: 0.18),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          borderRadius: AppRadius.cardRadius,
+          boxShadow: AppShadows.strong(brightness),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: AppRadius.cardRadius,
           child: Stack(fit: StackFit.expand, children: [
-            // Image de fond
             _Img(img: r.coverImg, width: 290, height: 148),
-
-            // Gradient sombre
-            Container(
+            DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                   colors: [
-                    Colors.black.withValues(alpha: 0.72),
-                    Colors.black.withValues(alpha: 0.25),
+                    AppColors.imageOverlay.withValues(alpha: 0.72),
+                    AppColors.imageOverlay.withValues(alpha: 0.25),
                   ],
                 ),
               ),
             ),
-
-            // Contenu
             Padding(
               padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Badge PROMO
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade500,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(8)),
                     child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.local_fire_department,
-                          size: 13, color: Colors.white),
+                      Icon(Icons.local_fire_department_rounded, size: 13, color: Colors.white),
                       SizedBox(width: 4),
                       Text('OFFRE SPÉCIALE',
                           style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5)),
+                              color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                     ]),
                   ),
-
-                  // Infos restaurant
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(r.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold)),
+                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
                       Row(children: [
                         Text(r.style,
-                            style: const TextStyle(
-                                color: Colors.orangeAccent,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500)),
+                            style: const TextStyle(color: Color(0xFFFFCC99), fontSize: 12, fontWeight: FontWeight.w500)),
                         const Spacer(),
-                        const Icon(Icons.star, size: 12, color: Colors.amber),
-                        Text(' ${r.rating.toStringAsFixed(1)}',
-                            style: const TextStyle(
-                                color: Colors.white70, fontSize: 12)),
+                        const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFFB020)),
+                        Text(' ${r.rating.toStringAsFixed(1)}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                         const SizedBox(width: 8),
-                        const Icon(Icons.timer,
-                            size: 12, color: Colors.white70),
-                        Text(' ${r.deliveryTime}m',
-                            style: const TextStyle(
-                                color: Colors.white70, fontSize: 12)),
+                        const Icon(Icons.timer_rounded, size: 12, color: Colors.white70),
+                        Text(' ${r.deliveryTime}m', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                       ]),
                     ],
                   ),
@@ -1282,7 +1057,7 @@ class _PromoCard extends StatelessWidget {
   }
 }
 
-// IMAGE   gére URL réseau + assets local
+// IMAGE — gère URL réseau + assets local, skeleton pendant chargement (règle #1)
 class _Img extends StatelessWidget {
   final String img;
   final double? width;
@@ -1294,9 +1069,8 @@ class _Img extends StatelessWidget {
     final fallback = Container(
         width: width,
         height: height,
-        color: Colors.orange.shade100,
-        child: const Center(
-            child: Icon(Icons.restaurant, color: Colors.orange, size: 30)));
+        color: AppColors.accent.withValues(alpha: 0.08),
+        child: const Center(child: Icon(Icons.restaurant_rounded, color: AppColors.accent, size: 30)));
 
     if (img.isEmpty) return fallback;
 
@@ -1306,24 +1080,13 @@ class _Img extends StatelessWidget {
         width: width,
         height: height,
         fit: BoxFit.cover,
-        placeholder: (_, __) => Container(
-          width: width,
-          height: height,
-          color: Colors.orange.shade50,
-          child: const Center(
-              child:
-                  CircularProgressIndicator(color: Colors.orange, strokeWidth: 2)),
-        ),
+        placeholder: (_, __) => SkeletonLoader.image(width: width, height: height, radius: BorderRadius.zero),
         errorWidget: (_, __, ___) => fallback,
       );
     }
 
     if (img.startsWith('assets/')) {
-      return Image.asset(img,
-          width: width,
-          height: height,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => fallback);
+      return Image.asset(img, width: width, height: height, fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback);
     }
 
     return fallback;

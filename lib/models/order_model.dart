@@ -15,19 +15,19 @@ class OrderModel {
   // Articles
   final List<OrderItem> items;
 
-  // CHAMPS FINANCIERS é Ventilation T = R + L + S
+  // CHAMPS FINANCIERS — Ventilation T = R + L + S
   // Ces 3 champs sont OBLIGATOIRES pour le webhook
 
-  /// R é Prix de la nourriture (va au restaurant)
+  /// R — Prix de la nourriture (va au restaurant)
   final int foodAmount;
 
-  /// L é Frais de livraison (70% au livreur, 30% é allofoods)
+  /// L — Frais de livraison (70% au livreur, 30% à allofoods)
   final int deliveryFee;
 
-  /// S é Frais de service fixe (va é allofoods)
+  /// S — Frais de service fixe (va à allofoods)
   final int serviceFee;
 
-  /// T é Montant total payé par le client (= foodAmount + deliveryFee + serviceFee)
+  /// T — Montant total payé par le client (= foodAmount + deliveryFee + serviceFee)
   final int totalAmount;
 
   // Paiement
@@ -47,7 +47,7 @@ class OrderModel {
   final double distanceKm;
 
   // Statut
-  /// pending ? confirmed ? preparing ? ready ? en_route ? delivered | cancelled
+  /// pending → confirmed → preparing → ready → en_route → delivered | cancelled
   final String status;
 
   // Tracking livreur
@@ -92,7 +92,7 @@ class OrderModel {
     this.paidAt,
   }) : assert(
           totalAmount == foodAmount + deliveryFee + serviceFee,
-          'T doit étre égal é R + L + S',
+          'totalAmount doit être égal à foodAmount + deliveryFee + serviceFee',
         );
 
   // Vers Firestore

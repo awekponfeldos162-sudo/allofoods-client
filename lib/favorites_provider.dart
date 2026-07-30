@@ -1,5 +1,5 @@
 // lib/providers/favorites_provider.dart
-// ? Favoris restaurants + plats é sauvegardés en local (SharedPreferences)
+// ✓ Favoris restaurants + plats — sauvegardés en local (SharedPreferences)
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';

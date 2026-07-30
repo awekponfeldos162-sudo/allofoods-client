@@ -81,7 +81,7 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
   Widget build(BuildContext context) {
     final topPad = MediaQuery.of(context).padding.top;
     final mapH = topPad + 270.0;
-    final isOpen = r.isCurrentlyOpen;
+    final isOpen = r.isActive;
 
     return Scaffold(
       backgroundColor: Colors.white,

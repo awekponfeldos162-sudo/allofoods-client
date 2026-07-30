@@ -17,7 +17,9 @@ const { getMessaging } = require("firebase-admin/messaging");
 const db  = getFirestore();
 const fcm = getMessaging();
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET ?? "allofoods_admin_2026";
+// Pas de fallback faible : si ADMIN_SECRET n'est pas configuré, l'accès
+// doit être refusé (fail closed), jamais retomber sur une valeur devinable.
+const ADMIN_SECRET = process.env.ADMIN_SECRET ?? null;
 
 // ══════════════════════════════════════════════════════
 // 1. PAIEMENT AUTO — Dernier jour du mois à 23h00
@@ -296,7 +298,7 @@ async function _notifyDriversPaid(drivers, month) {
 // ══════════════════════════════════════════════════════
 function _checkAdminKey(req, res) {
   const key = req.query.adminKey ?? req.body.adminKey;
-  if (key !== ADMIN_SECRET) {
+  if (!ADMIN_SECRET || !key || key !== ADMIN_SECRET) {
     res.status(403).json({ error: "Accès refusé — clé admin invalide" });
     return false;
   }

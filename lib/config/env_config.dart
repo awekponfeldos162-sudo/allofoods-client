@@ -61,8 +61,4 @@ class Env {
       dotenv.env['SUPABASE_BUCKET_LOGOS'] ?? 'Logos';
   static String get supabaseBucketFoods =>
       dotenv.env['SUPABASE_BUCKET_FOODS'] ?? 'Foods';
-
-  // Admin
-  static String get adminSecret => dotenv.env['ADMIN_SECRET'] ?? '';
-  static String get functionsBaseUrl => dotenv.env['FUNCTIONS_BASE_URL'] ?? '';
 }

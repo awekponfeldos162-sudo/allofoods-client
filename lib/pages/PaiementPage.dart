@@ -4,9 +4,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../models/cart_model.dart';
 import '../models/delivery_model.dart'
@@ -14,9 +17,10 @@ import '../models/delivery_model.dart'
 import '../services/fedapay_service.dart';
 import '../services/local_notification_service.dart';
 import '../services/payment_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/premium/premium.dart';
 import 'WaitingPage.dart';
 import 'fedapay_checkout_page.dart';
-
 
 class PaiementPage extends StatefulWidget {
   final int totalAmount;
@@ -60,13 +64,15 @@ class PaiementPage extends StatefulWidget {
 class _PaiementPageState extends State<PaiementPage> {
   bool _processing = false;
   bool _paymentInProgress = false;
+  int _shakeTrigger = 0;
   String _statusMessage = '';
   String? _activeOrderId;
   String? _activeTransactionId;
   Timer? _paymentPollTimer;
   final _phoneCtrl = TextEditingController();
   String _selectedOperator = 'mtn_open'; // 'mtn_open' | 'moov' | 'celtis'
-  String? _detectedOperator; // réseau détecté automatiquement depuis le numéro saisi
+  String?
+      _detectedOperator; // réseau détecté automatiquement depuis le numéro saisi
 
   // Génère un orderId unique
   String get _newOrderId => 'ORD-${DateTime.now().millisecondsSinceEpoch}';
@@ -76,9 +82,8 @@ class _PaiementPageState extends State<PaiementPage> {
   // Si 8 chiffres (ancien format), on ajoute juste "229".
   String get _apiPhone {
     final raw = _phoneCtrl.text.trim();
-    final digits = (raw.length == 10 && raw.startsWith('01'))
-        ? raw.substring(2)
-        : raw;
+    final digits =
+        (raw.length == 10 && raw.startsWith('01')) ? raw.substring(2) : raw;
     return '229$digits';
   }
 
@@ -115,24 +120,30 @@ class _PaiementPageState extends State<PaiementPage> {
 
   void _onPhoneChanged() {
     final raw = _phoneCtrl.text.trim();
-    final isComplete = raw.length == 8 || (raw.length == 10 && raw.startsWith('01'));
+    final isComplete =
+        raw.length == 8 || (raw.length == 10 && raw.startsWith('01'));
     final detected = isComplete ? _detectNetwork(raw) : null;
     if (detected != _detectedOperator) {
-      setState(() => _detectedOperator = detected);
+      setState(() {
+        _detectedOperator = detected;
+        // Auto-switch l'opérateur dès que le numéro est complet et reconnu
+        if (detected != null) _selectedOperator = detected;
+      });
     }
   }
 
   // Détecte l'opérateur béninois depuis les 2 premiers chiffres du numéro local (8 chiffres)
   static String? _detectNetwork(String rawPhone) {
     var digits = rawPhone.trim();
-    if (digits.length == 10 && digits.startsWith('01')) digits = digits.substring(2);
+    if (digits.length == 10 && digits.startsWith('01'))
+      digits = digits.substring(2);
     if (digits.length < 2) return null;
     final prefix = digits.substring(0, 2);
-    const mtn    = ['96', '97', '66', '67', '68', '69'];
-    const moov   = ['94', '95', '61', '62', '64', '65'];
-    const celtis = ['99', '98', '91', '93', '92', '63'];
-    if (mtn.contains(prefix))    return 'mtn_open';
-    if (moov.contains(prefix))   return 'moov';
+    const mtn = ['96', '97', '66', '67', '68', '69', '90'];
+    const moov = ['94', '95', '61', '62', '64', '65'];
+    const celtis = ['99', '98', '91', '93', '92', '63', '47'];
+    if (mtn.contains(prefix)) return 'mtn_open';
+    if (moov.contains(prefix)) return 'moov';
     if (celtis.contains(prefix)) return 'celtis';
     return null;
   }
@@ -240,6 +251,46 @@ class _PaiementPageState extends State<PaiementPage> {
     } catch (_) {}
   }
 
+  // Localisation + notifications sont indispensables pour le suivi de
+  // commande (position pour le livreur, notifications de statut) — on les
+  // exige avant de pouvoir passer commande plutôt qu'après, à froid.
+  Future<bool> _ensureRequiredPermissions() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      _snack('Activez la localisation pour pouvoir commander (suivi de livraison).',
+          Colors.orange);
+      return false;
+    }
+    var locPerm = await Geolocator.checkPermission();
+    if (locPerm == LocationPermission.denied) {
+      locPerm = await Geolocator.requestPermission();
+    }
+    if (!mounted) return false;
+    if (locPerm == LocationPermission.denied ||
+        locPerm == LocationPermission.deniedForever) {
+      _snack(
+        'La localisation est requise pour commander — activez-la dans les paramètres de votre téléphone.',
+        Colors.red,
+      );
+      return false;
+    }
+
+    final notifSettings = await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    if (!mounted) return false;
+    if (notifSettings.authorizationStatus == AuthorizationStatus.denied) {
+      _snack(
+        'Les notifications sont requises pour commander — activez-les dans les paramètres de votre téléphone.',
+        Colors.red,
+      );
+      return false;
+    }
+
+    return true;
+  }
+
   // FLUX PRINCIPAL
   Future<void> _pay() async {
     if (_paymentInProgress) {
@@ -248,16 +299,37 @@ class _PaiementPageState extends State<PaiementPage> {
     }
 
     if (context.read<CartProvider>().items.isEmpty || _foodAmount <= 0) {
-      _snack('Votre panier est vide. Ajoutez des articles avant de commander.', Colors.orange);
+      _snack('Votre panier est vide. Ajoutez des articles avant de commander.',
+          Colors.orange);
+      return;
+    }
+
+    if (!await _ensureRequiredPermissions()) return;
+    if (!mounted) return;
+
+    // Revérifier que le restaurant est toujours ouvert au moment de payer —
+    // il a pu fermer (heure ou manuellement) depuis l'ajout au panier.
+    final restSnap = await FirebaseFirestore.instance
+        .collection('restaurants')
+        .doc(widget.restaurantId)
+        .get();
+    final isOpen = restSnap.data()?['isActive'] as bool? ?? false;
+    if (!isOpen) {
+      final hours = restSnap.data()?['openingHours'] as String? ?? '';
+      if (!mounted) return;
+      _snack(
+        'Ce restaurant vient de fermer${hours.isNotEmpty ? ' (horaires : $hours)' : ''}. '
+        'Votre commande ne peut pas être finalisée.',
+        Colors.red,
+      );
       return;
     }
 
     final digits = _phoneCtrl.text.trim();
-    final validLength = digits.length == 8 ||
-        (digits.length == 10 && digits.startsWith('01'));
+    final validLength =
+        digits.length == 8 || (digits.length == 10 && digits.startsWith('01'));
     if (!validLength) {
-      _snack(
-          'Entrez votre numéro Mobile Money (ex : 0196123456 ou 96123456)',
+      _snack('Entrez votre numéro Mobile Money (ex : 0196123456 ou 96123456)',
           Colors.orange);
       return;
     }
@@ -289,6 +361,15 @@ class _PaiementPageState extends State<PaiementPage> {
       final restaurantId = context.read<CartProvider>().restaurantId.isNotEmpty
           ? context.read<CartProvider>().restaurantId
           : widget.restaurantId;
+
+      // initFedaPayPayment lit order.customerPhone côté serveur (jamais les
+      // paramètres client, non falsifiables) — il faut donc que ce champ
+      // reflète le numéro Mobile Money réellement saisi ici, pas l'ancien
+      // numéro de profil (souvent vide pour les comptes créés via Google).
+      await FirebaseFirestore.instance
+          .collection('orders')
+          .doc(orderId)
+          .update({'customerPhone': apiPhone});
 
       // 1. Créer la transaction avec merchant_reference et custom_metadata
       final txResult = await FedaPayService.createTransaction(
@@ -345,16 +426,21 @@ class _PaiementPageState extends State<PaiementPage> {
           await _onPaymentSuccess(orderId, transactionId);
         } else {
           await PaymentService.onPaymentFailure(orderId: orderId);
-          _snack(result?['message'] as String? ?? 'Paiement annulé.', Colors.orange);
+          _snack(result?['message'] as String? ?? 'Paiement annulé.',
+              Colors.orange);
         }
         return;
       }
 
-      // 3. Envoi paiement sans redirection — token + opérateur sélectionné
+      // 3. Envoi paiement sans redirection — toujours utiliser l'opérateur détecté
+      // (évite d'envoyer mtn_open pour un numéro Moov ou Celtis)
+      final effectiveOperator = _detectedOperator ?? _selectedOperator;
+      debugPrint(
+          '[Pay] token=${paymentToken.substring(0, paymentToken.length.clamp(0, 20))}… operator=$effectiveOperator');
       final pushResult = await FedaPayService.sendPaymentWithToken(
         token: paymentToken,
         phoneNumber: apiPhone,
-        operator: _selectedOperator,
+        operator: effectiveOperator,
       );
       if (!mounted) return;
 
@@ -369,8 +455,14 @@ class _PaiementPageState extends State<PaiementPage> {
           _processing = false;
           _statusMessage = '';
         });
-        _snack(pushResult['message'] ?? 'Impossible de lancer le paiement', Colors.red);
+        _snack(pushResult['message'] ?? 'Impossible de lancer le paiement',
+            Colors.red);
         return;
+      }
+
+      // Log l'erreur FedaPay si présente (diagnostic)
+      if (pushResult['fedapayError'] != null) {
+        debugPrint('[Pay] FedaPay push error: ${pushResult['fedapayError']}');
       }
 
       // Opérateur non disponible → fallback checkout WebView
@@ -392,7 +484,8 @@ class _PaiementPageState extends State<PaiementPage> {
           await _onPaymentSuccess(orderId, transactionId);
         } else {
           await PaymentService.onPaymentFailure(orderId: orderId);
-          _snack(result?['message'] as String? ?? 'Paiement annulé.', Colors.orange);
+          _snack(result?['message'] as String? ?? 'Paiement annulé.',
+              Colors.orange);
         }
         return;
       }
@@ -403,7 +496,8 @@ class _PaiementPageState extends State<PaiementPage> {
         _paymentInProgress = true;
         _activeOrderId = orderId;
         _activeTransactionId = transactionId;
-        _statusMessage = 'Confirmez le paiement sur votre téléphone. Vérification automatique en cours.';
+        _statusMessage =
+            'Confirmez le paiement sur votre téléphone. Vérification automatique en cours.';
       });
       context.read<CartProvider>().clear();
       LocalNotificationService.showUssdPaymentSent(phoneNumber: _apiPhone);
@@ -482,7 +576,9 @@ class _PaiementPageState extends State<PaiementPage> {
           _statusMessage = '';
         });
         _snack(
-          isExpired ? 'Paiement expiré. Veuillez réessayer.' : 'Paiement refusé ou annulé.',
+          isExpired
+              ? 'Paiement expiré. Veuillez réessayer.'
+              : 'Paiement refusé ou annulé.',
           Colors.orange,
         );
         return;
@@ -506,17 +602,15 @@ class _PaiementPageState extends State<PaiementPage> {
 
   Future<void> _onPaymentSuccess(String orderId, String txId) async {
     try {
-      // Un seul update — consolide PaymentService.onPaymentSuccess + confirmation
-      await FirebaseFirestore.instance
-          .collection('orders')
-          .doc(orderId)
-          .update({
-        'status': 'paid',
-        'paymentStatus': 'PAID',
-        'fedaPayTransactionId': txId,
-        'paymentConfirmedAt': FieldValue.serverTimestamp(),
-        'paidAt': FieldValue.serverTimestamp(),
-      });
+      // Confirmation serveur — vérifie le paiement auprès de FedaPay avant
+      // d'écrire paymentStatus: 'PAID' (le client ne peut plus le faire
+      // directement, voir firestore.rules + confirmOrderPayment).
+      await PaymentService.onPaymentSuccess(
+        orderId: orderId,
+        txId: txId,
+        foodAmount: _foodAmount,
+        deliveryFee: widget.deliveryFee,
+      );
       if (widget.promoDocId != null) {
         // promoDocId est le chemin complet : "promo_codes/id" ou "restaurants/id/promos/id"
         final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -556,11 +650,12 @@ class _PaiementPageState extends State<PaiementPage> {
 
   void _snack(String msg, Color bg) {
     if (!mounted) return;
+    if (bg == Colors.red) setState(() => _shakeTrigger++);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
       backgroundColor: bg,
       behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.button)),
     ));
   }
 
@@ -627,54 +722,25 @@ class _PaiementPageState extends State<PaiementPage> {
 
         // Bouton payer / vérifier (masqué si panier vide et pas de paiement en cours)
         if (_foodAmount > 0 || _paymentInProgress)
-          ElevatedButton(
+          PremiumButton(
+            label: _paymentInProgress
+                ? 'Vérifier mon paiement'
+                : 'Commander — $_paidOnline FCFA',
+            icon: _paymentInProgress ? Icons.refresh_rounded : Icons.lock_outline_rounded,
+            loading: _processing,
+            height: 56,
             onPressed: _processing ? null : _pay,
-            style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  _paymentInProgress ? Colors.black87 : Colors.orange,
-              disabledBackgroundColor: (_paymentInProgress
-                      ? Colors.black87
-                      : Colors.orange)
-                  .withValues(alpha: 0.5),
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 56),
-              shape:
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-            ),
-            child: _processing
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2.5))
-                : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Icon(
-                      _paymentInProgress ? Icons.refresh : Icons.lock_outline,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        _paymentInProgress
-                            ? 'Vérifier mon paiement'
-                            : 'Commander — $_paidOnline FCFA',
-                        style: const TextStyle(
-                            fontSize: 17, fontWeight: FontWeight.bold),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ]),
-          ),
+          ).animate(key: ValueKey(_shakeTrigger)).shake(hz: 4, duration: 400.ms),
         const SizedBox(height: 12),
 
         // Ligne sécurité
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Icon(Icons.security, size: 14, color: Colors.grey),
+          Icon(Icons.security_rounded, size: 14, color: AppTextStyles.textTheme(Theme.of(context).brightness).bodySmall?.color),
           const SizedBox(width: 4),
           Flexible(
             child: Text(
               'Paiement sécurisé — Commande confirmée après paiement',
-              style: const TextStyle(color: Colors.grey, fontSize: 11),
+              style: AppTextStyles.textTheme(Theme.of(context).brightness).labelSmall,
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -934,17 +1000,17 @@ class _MomoForm extends StatelessWidget {
   });
 
   static const _operators = [
-    ('mtn_open', 'MTN MoMo',   Color(0xFFFFCC00)),
-    ('moov',     'Moov Money', Color(0xFF0057A8)),
-    ('celtis',   'Celtis',     Color(0xFF00A859)),
+    ('mtn_open', 'MTN MoMo', Color(0xFFFFCC00)),
+    ('moov', 'Moov Money', Color(0xFF0057A8)),
+    ('celtis', 'Celtis', Color(0xFF00A859)),
   ];
 
   static String _operatorLabel(String key) => switch (key) {
-    'mtn_open' => 'MTN MoMo',
-    'moov'     => 'Moov Money',
-    'celtis'   => 'Celtis',
-    _          => key,
-  };
+        'mtn_open' => 'MTN MoMo',
+        'moov' => 'Moov Money',
+        'celtis' => 'Celtis',
+        _ => key,
+      };
 
   @override
   Widget build(BuildContext context) => Container(
@@ -959,7 +1025,8 @@ class _MomoForm extends StatelessWidget {
           const Text('Opérateur',
               style: TextStyle(fontSize: 12, color: Colors.grey)),
           const SizedBox(height: 8),
-          Row(children: _operators.map((op) {
+          Row(
+              children: _operators.map((op) {
             final (key, label, color) = op;
             final isSelected = selectedOperator == key;
             return Expanded(
@@ -1037,7 +1104,8 @@ class _MomoForm extends StatelessWidget {
                 border: Border.all(color: Colors.orange.shade200),
               ),
               child: Row(children: [
-                const Icon(Icons.warning_amber_outlined, color: Colors.orange, size: 16),
+                const Icon(Icons.warning_amber_outlined,
+                    color: Colors.orange, size: 16),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -1049,7 +1117,8 @@ class _MomoForm extends StatelessWidget {
                 GestureDetector(
                   onTap: () => onOperatorChanged(detectedOperator!),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.orange,
                       borderRadius: BorderRadius.circular(8),
@@ -1057,7 +1126,9 @@ class _MomoForm extends StatelessWidget {
                     child: const Text(
                       'Basculer',
                       style: TextStyle(
-                          fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
+                          fontSize: 11,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
@@ -1067,8 +1138,9 @@ class _MomoForm extends StatelessWidget {
           _info(
               Icons.info_outline,
               Colors.blue,
-              'Une notification USSD sera envoyée sur votre téléphone. '
-              'Confirmez avec votre code secret Mobile Money.'),
+              'L\'opérateur est détecté automatiquement. '
+              'Une notification USSD sera envoyée sur votre téléphone — '
+              'confirmez avec votre code secret Mobile Money.'),
         ]),
       );
 }
@@ -1148,72 +1220,64 @@ class _PaymentWaitingPanel extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Row(children: [
-            Icon(Icons.phone_android, color: Colors.black54, size: 20),
-            SizedBox(width: 8),
-            Text(
-              'Paiement Mobile Money en cours',
-              style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                  fontSize: 14),
-            ),
-          ]),
-          const SizedBox(height: 12),
-          _InfoRow(label: 'Numéro', value: phone),
-          const SizedBox(height: 12),
-          if (processing)
-            Row(children: [
-              const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.black54),
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.06),
+        borderRadius: AppRadius.cardRadius,
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.phone_android_rounded, color: AppColors.accent, size: 20)
+              .animate(onPlay: (c) => c.repeat(reverse: true))
+              .scaleXY(end: 1.15, duration: 700.ms, curve: Curves.easeInOut),
+          const SizedBox(width: 8),
+          Text('Paiement Mobile Money en cours', style: texts.titleSmall),
+        ]),
+        const SizedBox(height: AppSpacing.sm),
+        _InfoRow(label: 'Numéro', value: phone),
+        const SizedBox(height: AppSpacing.sm),
+        if (processing)
+          Row(children: [
+            Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle))
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .fadeIn(duration: 500.ms)
+                .then()
+                .fadeOut(duration: 500.ms),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                statusMessage.isEmpty ? 'Vérification du paiement...' : statusMessage,
+                style: texts.bodySmall,
               ),
+            ),
+          ])
+        else
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: brightness == Brightness.dark ? AppColors.surfaceDark : AppColors.surfaceLight,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(children: [
+              Icon(Icons.info_outline_rounded, color: texts.bodySmall?.color, size: 15),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   statusMessage.isEmpty
-                      ? 'Vérification du paiement...'
+                      ? 'Confirmez le paiement sur votre téléphone, puis appuyez sur "Vérifier mon paiement".'
                       : statusMessage,
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  style: texts.bodyMedium,
                 ),
               ),
-            ])
-          else
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(children: [
-                const Icon(Icons.info_outline,
-                    color: Colors.black54, size: 15),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    statusMessage.isEmpty
-                        ? 'Confirmez le paiement sur votre téléphone, puis appuyez sur "Vérifier mon paiement".'
-                        : statusMessage,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ]),
-            ),
-        ]),
-      );
+            ]),
+          ),
+      ]),
+    );
+  }
 }
 
 class _InfoRow extends StatelessWidget {

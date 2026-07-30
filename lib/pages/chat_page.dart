@@ -1,4 +1,4 @@
-// lib/pages/chat_page.dart é Client ? Driver real-time chat
+// lib/pages/chat_page.dart — Client ↔ Driver real-time chat
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';

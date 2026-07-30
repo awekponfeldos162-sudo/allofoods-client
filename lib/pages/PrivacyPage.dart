@@ -24,55 +24,55 @@ class PrivacyPage extends StatelessWidget {
             icon: Icons.info_outline,
             title: "1. Données collectées",
             content:
-                "allofoods collecte les données suivantes :\né Informations d'identité : nom, prénom, adresse email\né Coordonnées : numéro de téléphone, adresse de livraison\né Données de commandes : historique, préférences alimentaires\né Données de paiement : numéro Mobile Money (jamais stocké en clair)\né Données de localisation : uniquement lors de la livraison\né Photo de profil : optionnelle, stockée sur Supabase Storage",
+                "allofoods collecte les données suivantes :\n• Informations d'identité : nom, prénom, adresse email\n• Coordonnées : numéro de téléphone, adresse de livraison\n• Données de commandes : historique, préférences alimentaires\n• Données de paiement : numéro Mobile Money (jamais stocké en clair)\n• Données de localisation : uniquement lors de la livraison\n• Photo de profil : optionnelle, stockée sur Supabase Storage",
           ),
           _Section(
             icon: Icons.track_changes,
             title: "2. Finalités du traitement",
             content:
-                "Vos données sont utilisées pour :\né Créer et gérer votre compte utilisateur\né Traiter et livrer vos commandes\né Vous envoyer des notifications de statut de commande\né Améliorer nos services et l'expérience utilisateur\né Prévenir la fraude et assurer la sécurité\né Respecter nos obligations légales",
+                "Vos données sont utilisées pour :\n• Créer et gérer votre compte utilisateur\n• Traiter et livrer vos commandes\n• Vous envoyer des notifications de statut de commande\n• Améliorer nos services et l'expérience utilisateur\n• Prévenir la fraude et assurer la sécurité\n• Respecter nos obligations légales",
           ),
           _Section(
             icon: Icons.storage,
             title: "3. Stockage et sécurité",
             content:
-                "Vos données sont stockées de manière sécurisée via :\né Firebase (Google Cloud) é authentification et base de données\né Supabase Storage é photos de profil\né KKiaPay é transactions de paiement\n\nNous appliquons des mesures de sécurité techniques et organisationnelles pour protéger vos données contre tout accès non autorisé.",
+                "Vos données sont stockées de manière sécurisée via :\n• Firebase (Google Cloud) — authentification et base de données\n• Supabase Storage — photos de profil\n• FedaPay — transactions de paiement\n\nNous appliquons des mesures de sécurité techniques et organisationnelles pour protéger vos données contre tout accès non autorisé.",
           ),
           _Section(
             icon: Icons.share,
             title: "4. Partage des données",
             content:
-                "Nous ne vendons jamais vos données personnelles. Elles peuvent étre partagées avec :\né Les restaurants partenaires (uniquement les infos nécessaires à votre commande)\né Les livreurs (nom, adresse de livraison, téléphone)\né Nos prestataires techniques (Firebase, Supabase Storage, KKiaPay)\né Les autorités compétentes en cas d'obligation légale",
+                "Nous ne vendons jamais vos données personnelles. Elles peuvent être partagées avec :\n• Les restaurants partenaires (uniquement les infos nécessaires à votre commande)\n• Les livreurs (nom, adresse de livraison, téléphone)\n• Nos prestataires techniques (Firebase, Supabase Storage, FedaPay)\n• Les autorités compétentes en cas d'obligation légale",
           ),
           _Section(
             icon: Icons.timer,
             title: "5. Durée de conservation",
             content:
-                "Vos données sont conservées :\né Compte actif : pendant toute la durée d'utilisation\né Historique de commandes : 3 ans après la dernière commande\né Données de paiement : conformêment aux obligations légales (5 ans)\né Après suppression du compte : 30 jours puis suppression définitive",
+                "Vos données sont conservées :\n• Compte actif : pendant toute la durée d'utilisation\n• Historique de commandes : 3 ans après la dernière commande\n• Données de paiement : conformément aux obligations légales (5 ans)\n• Après suppression du compte : 30 jours puis suppression définitive",
           ),
           _Section(
             icon: Icons.gavel,
             title: "6. Vos droits",
             content:
-                "Conformêment à la règlementation applicable, vous disposez des droits suivants :\né Droit d'accès é vos données\né Droit de rectification\né Droit à l'effacement (droit à l'oubli)\né Droit à la portabilité\né Droit d'opposition au traitement\n\nPour exercer ces droits, contactez : privacy@allofoods.bj",
+                "Conformément à la règlementation applicable, vous disposez des droits suivants :\n• Droit d'accès à vos données\n• Droit de rectification\n• Droit à l'effacement (droit à l'oubli)\n• Droit à la portabilité\n• Droit d'opposition au traitement\n\nPour exercer ces droits, contactez : privacy@allofoods.bj",
           ),
           _Section(
             icon: Icons.location_on_outlined,
             title: "7. Localisation",
             content:
-                "L'application peut accéder à votre localisation uniquement avec votre consentement explicite. Cette donnée est utilisée pour :\né Calculer les frais de livraison\né Permettre le suivi de votre commande\né Suggérer des restaurants proches de vous\n\nVous pouvez désactiver la localisation à tout moment dans les paramètres de votre téléphone.",
+                "L'application peut accéder à votre localisation uniquement avec votre consentement explicite. Cette donnée est utilisée pour :\n• Calculer les frais de livraison\n• Permettre le suivi de votre commande\n• Suggérer des restaurants proches de vous\n\nVous pouvez désactiver la localisation à tout moment dans les paramètres de votre téléphone.",
           ),
           _Section(
             icon: Icons.notifications_outlined,
             title: "8. Notifications",
             content:
-                "Nous vous envoyons des notifications push pour :\né Confirmer vos commandes\né Vous informer du statut de livraison\né Vous proposer des offres personnalisées (avec votre accord)\n\nVous pouvez gérer vos préférences de notifications dans les paramètres de l'application.",
+                "Nous vous envoyons des notifications push pour :\n• Confirmer vos commandes\n• Vous informer du statut de livraison\n• Vous proposer des offres personnalisées (avec votre accord)\n\nVous pouvez gérer vos préférences de notifications dans les paramètres de l'application.",
           ),
           _Section(
             icon: Icons.contact_mail_outlined,
             title: "9. Contact & réclamations",
             content:
-                "Pour toute question relative é vos données personnelles :\né Email : privacy@allofoods.bj\né Téléphone : +229 01 47 17 49 51\né Adresse : Cotonou, République du Bénin\n\nDernière mise à jour : Mars 2025",
+                "Pour toute question relative à vos données personnelles :\n• Email : privacy@allofoods.bj\n• Téléphone : +229 01 47 17 49 51\n• Adresse : Cotonou, République du Bénin\n\nDernière mise à jour : Mars 2025",
           ),
         ],
       ),

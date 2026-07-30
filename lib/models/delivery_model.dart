@@ -139,7 +139,7 @@ class DeliveryProvider extends ChangeNotifier {
   bool get hasAddress => _clientPosition != null;
   bool get loadingRestaurant => _loadingRestaurant;
 
-  // POSITION CLIENT é définie après sélection dans AdressePage
+  // POSITION CLIENT — définie après sélection dans AdressePage
   // (GPS réel ou adresse saisie + geocoding)
   void setClientPosition(LatLngPoint pos, String address) {
     _clientPosition = pos;
@@ -148,7 +148,7 @@ class DeliveryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // POSITION RESTAURANT é chargée depuis Firestore
+  // POSITION RESTAURANT — chargée depuis Firestore
   // Le document restaurant doit avoir les champs lat + lng
   // Si absent ? fallback centre Cotonou
   Future<void> setRestaurant(String id) async {

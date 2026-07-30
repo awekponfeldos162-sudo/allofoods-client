@@ -8,7 +8,7 @@ class ReviewModel {
   final String clientUid;
   final String clientName;
   final String? clientImageUrl;
-  final double rating;    // 1.0 é 5.0
+  final double rating;    // 1.0 à 5.0
   final String comment;
   final String? orderId;
   final DateTime? createdAt;

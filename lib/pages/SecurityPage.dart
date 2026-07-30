@@ -1,5 +1,5 @@
 // lib/pages/SecurityPage.dart
-// ? Firebase Auth é changement mot de passe + ré-authentification
+// ✓ Firebase Auth — changement mot de passe + ré-authentification
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -64,7 +64,7 @@ class _SecurityPageState extends State<SecurityPage> {
       case 3:
         return 'Bon';
       case 4:
-        return 'Fort ?';
+        return 'Fort 💪';
       default:
         return '';
     }
@@ -84,7 +84,7 @@ class _SecurityPageState extends State<SecurityPage> {
       return;
     }
     if (newPass.length < 6) {
-      _snack('Minimum 6 caractéres', error: true);
+      _snack('Minimum 6 caractères', error: true);
       return;
     }
 
@@ -98,7 +98,7 @@ class _SecurityPageState extends State<SecurityPage> {
       await user.updatePassword(newPass);
 
       if (!mounted) return;
-      _snack('? Mot de passe mis à jour !');
+      _snack('✅ Mot de passe mis à jour !');
       _currentCtrl.clear();
       _newCtrl.clear();
       _confirmCtrl.clear();
@@ -287,7 +287,7 @@ class _SecurityPageState extends State<SecurityPage> {
               ]),
               const SizedBox(height: 8),
               ...[
-                'Minimum 8 caractéres',
+                'Minimum 8 caractères',
                 'Mélangez majuscules, chiffres et symboles',
                 'N\'utilisez pas votre date de naissance',
                 'Ne partagez jamais votre mot de passe',

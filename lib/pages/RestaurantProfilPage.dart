@@ -1,8 +1,10 @@
 // lib/pages/RestaurantProfilPage.dart
 
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:http/http.dart' as http;
 import 'package:share_plus/share_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,6 +15,8 @@ import '../models/restaurant_model.dart';
 import '../models/cart_model.dart';
 import '../models/review_model.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/premium/premium.dart';
 import 'PanierPage.dart';
 import '../widgets/image_viewer.dart';
 import 'plat_detail_page.dart';
@@ -99,10 +103,7 @@ class _RestaurantProfilePageState extends State<RestaurantProfilePage>
     }
     if (!mounted) return;
     final cats = target.plats.map((p) => p.category).toSet().toList();
-    final allCats = [
-      ...(cats.isEmpty ? ['Menu'] : cats),
-      'Avis'
-    ];
+    final allCats = [...(cats.isEmpty ? ['Menu'] : cats), 'Avis'];
     setState(() {
       _fullRestaurant = target;
       _categories = allCats;
@@ -115,13 +116,13 @@ class _RestaurantProfilePageState extends State<RestaurantProfilePage>
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+
     if (_loading || _tabController == null) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        appBar: AppBar(
-            backgroundColor: Colors.white, foregroundColor: Colors.black87),
-        body: const Center(
-            child: CircularProgressIndicator(color: Colors.orange)),
+        appBar: AppBar(),
+        body: const _RestaurantSkeleton(),
       );
     }
 
@@ -132,100 +133,62 @@ class _RestaurantProfilePageState extends State<RestaurantProfilePage>
           cart.restaurantId != r.id) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
-              '?? Votre panier contient des articles de ${cart.restaurantName}. '
+              '⚠️ Votre panier contient des articles de ${cart.restaurantName}. '
               'Ajouter ici videra votre panier.'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppColors.secondary,
           duration: const Duration(seconds: 4),
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.button)),
         ));
       }
     });
 
-    if (!r.isActive) {
-      return Scaffold(
-        appBar: AppBar(
-            title: Text(r.name),
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black87),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.store_mall_directory_outlined,
-                  size: 64, color: Colors.grey),
-              const SizedBox(height: 16),
-              const Text('Restaurant temporairement indisponible',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center),
-              const SizedBox(height: 8),
-              Text("Ce restaurant n'est pas encore disponible.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey.shade500)),
-            ]),
-          ),
-        ),
-      );
-    }
-
-    final isOpen = r.isCurrentlyOpen;
+    // Un restaurant fermé (hors horaires ou fermé manuellement) reste
+    // explorable — seule la commande est bloquée (voir _PlatCard._addToCart).
+    // isActive est la source de vérité temps réel (auto-fermé par la Cloud
+    // Function enforceRestaurantHours dès l'heure de fermeture dépassée).
+    final isOpen = r.isActive;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: NestedScrollView(
         controller: _scrollCtrl,
         headerSliverBuilder: (ctx, _) => [
-          // AppBar responsive : transparent sur image, blanc quand scrollé
+          // AppBar responsive : transparent sur image, thème quand scrollé
           SliverAppBar(
             pinned: true,
             expandedHeight: _coverHeight,
-            backgroundColor: _collapsed ? Colors.white : Colors.transparent,
-            foregroundColor: _collapsed ? Colors.black87 : Colors.white,
+            backgroundColor: _collapsed ? Theme.of(ctx).scaffoldBackgroundColor : Colors.transparent,
+            foregroundColor: _collapsed
+                ? (brightness == Brightness.dark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
+                : Colors.white,
             elevation: _collapsed ? 1 : 0,
             shadowColor: Colors.black26,
             surfaceTintColor: Colors.transparent,
             automaticallyImplyLeading: false,
             title: _collapsed
-                ? Text(r.name,
-                    style: const TextStyle(
-                        color: Colors.black87,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis)
+                ? Text(r.name, style: AppTextStyles.textTheme(brightness).titleLarge, overflow: TextOverflow.ellipsis)
                 : null,
             leading: _collapsed
-                ? IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black87),
-                    onPressed: () => Navigator.pop(ctx),
-                  )
+                ? IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: () => Navigator.pop(ctx))
                 : Padding(
                     padding: const EdgeInsets.all(8),
-                    child: _CircleBtn(
-                        icon: Icons.arrow_back,
-                        onTap: () => Navigator.pop(ctx)),
+                    child: _CircleBtn(icon: Icons.arrow_back_rounded, onTap: () => Navigator.pop(ctx)),
                   ),
             actions: _collapsed
                 ? [
+                    IconButton(icon: const Icon(Icons.share_outlined), onPressed: _share),
                     IconButton(
-                      icon: const Icon(Icons.share_outlined,
-                          color: Colors.black87),
-                      onPressed: _share,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.search, color: Colors.black87),
-                      onPressed: () {
-                        _scrollCtrl.animateTo(_coverHeight,
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeOut);
-                      },
+                      icon: const Icon(Icons.search_rounded),
+                      onPressed: () => _scrollCtrl.animateTo(_coverHeight,
+                          duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
                     ),
                     Consumer<FavoritesProvider>(
                       builder: (_, favs, __) {
                         final isFav = favs.isFavRestaurant(r.id);
                         return IconButton(
-                          icon: Icon(
-                            isFav ? Icons.favorite : Icons.favorite_border,
-                            color: isFav ? Colors.red : Colors.black87,
-                          ),
+                          icon: Icon(isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                              color: isFav ? AppColors.error : null),
                           onPressed: () => favs.toggleRestaurant(r.id),
                         );
                       },
@@ -235,13 +198,11 @@ class _RestaurantProfilePageState extends State<RestaurantProfilePage>
                           ? IconButton(
                               icon: Badge(
                                 label: Text('${cart.itemCount}'),
-                                child: const Icon(Icons.shopping_cart_outlined,
-                                    color: Colors.black87),
+                                backgroundColor: AppColors.accent,
+                                child: const Icon(Icons.shopping_cart_outlined),
                               ),
-                              onPressed: () => Navigator.push(
-                                  ctx2,
-                                  MaterialPageRoute(
-                                      builder: (_) => const PanierPage())),
+                              onPressed: () =>
+                                  Navigator.push(ctx2, MaterialPageRoute(builder: (_) => const PanierPage())),
                             )
                           : const SizedBox.shrink(),
                     ),
@@ -253,10 +214,9 @@ class _RestaurantProfilePageState extends State<RestaurantProfilePage>
                         return Padding(
                           padding: const EdgeInsets.only(right: 4),
                           child: _CircleBtn(
-                            icon:
-                                isFav ? Icons.favorite : Icons.favorite_border,
+                            icon: isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                             onTap: () => favs.toggleRestaurant(r.id),
-                            color: isFav ? Colors.red : Colors.white,
+                            color: isFav ? AppColors.error : Colors.white,
                           ),
                         );
                       },
@@ -266,24 +226,18 @@ class _RestaurantProfilePageState extends State<RestaurantProfilePage>
                         padding: const EdgeInsets.only(right: 8),
                         child: _CircleBtn(
                           icon: Icons.shopping_cart_outlined,
-                          badge:
-                              cart.itemCount > 0 ? '${cart.itemCount}' : null,
-                          onTap: () => Navigator.push(
-                              ctx2,
-                              MaterialPageRoute(
-                                  builder: (_) => const PanierPage())),
+                          badge: cart.itemCount > 0 ? '${cart.itemCount}' : null,
+                          onTap: () =>
+                              Navigator.push(ctx2, MaterialPageRoute(builder: (_) => const PanierPage())),
                         ),
                       ),
                     ),
                   ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: _buildCoverOnly(ctx, isOpen),
-            ),
+            flexibleSpace: FlexibleSpaceBar(background: _buildCoverOnly(ctx, isOpen)),
           ),
 
-          // Infos restaurant (scroll avec la page)
           SliverToBoxAdapter(child: _buildRestaurantInfo(ctx, isOpen)),
-          // Recherche + TabBar (épinglées ensemble)
+
           SliverPersistentHeader(
             pinned: true,
             delegate: _StickyBarDelegate(
@@ -291,12 +245,11 @@ class _RestaurantProfilePageState extends State<RestaurantProfilePage>
                 controller: _tabController!,
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
-                indicatorColor: Colors.orange,
-                labelColor: Colors.orange,
-                unselectedLabelColor: Colors.grey,
+                indicatorColor: AppColors.accent,
+                labelColor: AppColors.accent,
+                unselectedLabelColor: AppColors.textSecondaryLight,
                 dividerColor: Colors.transparent,
-                labelStyle:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 tabs: _categories.map((c) => Tab(text: c)).toList(),
               ),
               bgColor: Theme.of(ctx).scaffoldBackgroundColor,
@@ -316,85 +269,63 @@ class _RestaurantProfilePageState extends State<RestaurantProfilePage>
             if (cat == 'Avis') {
               return _ReviewsTab(restaurantId: r.id, restaurantName: r.name);
             }
-            final plats = r.plats
-                .where((p) => p.category == cat && _matchSearch(p))
-                .toList();
+            final plats = r.plats.where((p) => p.category == cat && _matchSearch(p)).toList();
             return ListView.builder(
-              padding: const EdgeInsets.only(
-                  top: 8, left: 14, right: 14, bottom: 100),
+              padding: const EdgeInsets.only(top: 8, left: AppSpacing.md, right: AppSpacing.md, bottom: 100),
               itemCount: plats.isEmpty ? 1 : plats.length,
               itemBuilder: (context, i) {
                 if (plats.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.only(top: 40),
-                    child: Center(
-                        child:
-                            Column(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.search_off, size: 40, color: Colors.grey),
-                      SizedBox(height: 8),
-                      Text('Aucun plat trouvé',
-                          style: TextStyle(color: Colors.grey)),
-                    ])),
-                  );
+                  return _EmptySearch(query: _searchQuery);
                 }
-                return _PlatCard(
-                    plat: plats[i], restaurant: r, isRestaurantOpen: isOpen);
+                return _PlatCard(plat: plats[i], restaurant: r, isRestaurantOpen: isOpen)
+                    .animate()
+                    .fadeIn(duration: 250.ms, delay: (i * 40).ms)
+                    .slideY(begin: 0.04, end: 0);
               },
             );
           }).toList(),
         ),
       ),
-      floatingActionButton: _CartFAB(),
+      floatingActionButton: const _CartFAB(),
     );
   }
 
   // Image couverture seule (utilisée dans FlexibleSpaceBar)
   Widget _buildCoverOnly(BuildContext context, bool isOpen) {
     return Stack(fit: StackFit.expand, children: [
-      _AnyImage(img: r.coverImg, fit: BoxFit.cover),
-      Container(
+      Hero(
+        tag: AnimatedRestaurantCard.heroTag(r.id),
+        child: _AnyImage(img: r.coverImg, fit: BoxFit.cover),
+      ),
+      DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Colors.black.withValues(alpha: 0.15),
-              Colors.black.withValues(alpha: 0.65),
-            ],
+            colors: [AppColors.imageOverlay.withValues(alpha: 0.15), AppColors.imageOverlay.withValues(alpha: 0.65)],
           ),
         ),
       ),
-      // Badge ouvert/fermé
       Positioned(
         top: MediaQuery.of(context).padding.top + 56,
-        left: 16,
+        left: AppSpacing.md,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: isOpen
-                ? Colors.green.withValues(alpha: 0.85)
-                : Colors.red.withValues(alpha: 0.85),
-            borderRadius: BorderRadius.circular(20),
+            color: (isOpen ? AppColors.success : AppColors.error).withValues(alpha: 0.9),
+            borderRadius: AppRadius.chipRadius,
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(
-              isOpen ? Icons.circle : Icons.do_not_disturb_on_outlined,
-              size: 8,
-              color: Colors.white,
-            ),
+            Icon(isOpen ? Icons.circle : Icons.do_not_disturb_on_outlined, size: 8, color: Colors.white),
             const SizedBox(width: 4),
             Text(isOpen ? 'Ouvert' : 'Fermé',
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold)),
+                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
           ]),
         ),
       ),
-      // Nom + style en bas
       Positioned(
-        bottom: 16,
-        left: 16,
+        bottom: AppSpacing.md,
+        left: AppSpacing.md,
         right: 80,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(r.name,
@@ -404,31 +335,24 @@ class _RestaurantProfilePageState extends State<RestaurantProfilePage>
                   fontWeight: FontWeight.bold,
                   shadows: [Shadow(blurRadius: 4, color: Colors.black54)])),
           const SizedBox(height: 3),
-          Text(r.style,
-              style: const TextStyle(color: Colors.orangeAccent, fontSize: 13)),
+          Text(r.style, style: const TextStyle(color: Color(0xFFFFCC99), fontSize: 13)),
         ]),
       ),
-      // Logo
       Positioned(
         bottom: 12,
-        right: 16,
+        right: AppSpacing.md,
         child: GestureDetector(
           onTap: () => ImageViewer.open(context, r.logoImg, 'logo_${r.id}'),
           child: Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 3),
-              boxShadow: const [
-                BoxShadow(color: Colors.black26, blurRadius: 8)
-              ],
+              boxShadow: AppShadows.medium(Brightness.light),
             ),
             child: CircleAvatar(
               radius: 28,
               backgroundColor: Colors.white,
-              child: ClipOval(
-                child: _AnyImage(
-                    img: r.logoImg, width: 56, height: 56, fit: BoxFit.cover),
-              ),
+              child: ClipOval(child: _AnyImage(img: r.logoImg, width: 56, height: 56, fit: BoxFit.cover)),
             ),
           ),
         ),
@@ -438,119 +362,86 @@ class _RestaurantProfilePageState extends State<RestaurantProfilePage>
 
   // Infos restaurant (tags, stats, adresse, description…)
   Widget _buildRestaurantInfo(BuildContext context, bool isOpen) {
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
     return Container(
       color: Theme.of(context).cardColor,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, 12, AppSpacing.md, 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Wrap(
           spacing: 8,
           runSpacing: 6,
           children: r.tags
               .map((tag) => Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.orange.shade200),
+                      color: AppColors.accent.withValues(alpha: 0.08),
+                      borderRadius: AppRadius.chipRadius,
                     ),
                     child: Text(tag,
-                        style: TextStyle(
-                            color: Colors.orange.shade800,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500)),
+                        style: const TextStyle(color: AppColors.accent, fontSize: 11, fontWeight: FontWeight.w600)),
                   ))
               .toList(),
         ),
         const SizedBox(height: 10),
         Row(children: [
-          _StatChip(
-              icon: Icons.star,
-              color: Colors.amber,
-              label: r.rating.toStringAsFixed(1)),
+          _StatChip(icon: Icons.star_rounded, color: const Color(0xFFFFB020), label: r.rating.toStringAsFixed(1)),
           const SizedBox(width: 14),
-          _StatChip(
-              icon: Icons.delivery_dining,
-              color: Colors.blue,
-              label: '${r.deliveryTime} min'),
+          _StatChip(icon: Icons.delivery_dining_rounded, color: AppColors.info, label: '${r.deliveryTime} min'),
           const SizedBox(width: 14),
-          _StatChip(
-              icon: Icons.shopping_bag_outlined,
-              color: Colors.green,
-              label: 'Min ${r.minOrder} FCFA'),
+          _StatChip(icon: Icons.shopping_bag_outlined, color: AppColors.success, label: 'Min ${r.minOrder} FCFA'),
         ]),
         const SizedBox(height: 8),
         Row(children: [
-          const Icon(Icons.location_on_outlined, size: 14, color: Colors.grey),
+          Icon(Icons.location_on_outlined, size: 14, color: texts.bodySmall?.color),
           const SizedBox(width: 3),
-          Expanded(
-              child: Text(r.address,
-                  style: const TextStyle(fontSize: 11, color: Colors.grey))),
-          const Icon(Icons.access_time, size: 14, color: Colors.grey),
+          Expanded(child: Text(r.address, style: texts.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis)),
+          Icon(Icons.access_time_rounded, size: 14, color: texts.bodySmall?.color),
           const SizedBox(width: 3),
           Text(r.openingHours,
               style: TextStyle(
-                  fontSize: 11,
-                  color: isOpen ? Colors.green : Colors.red,
-                  fontWeight: FontWeight.w600)),
+                  fontSize: 11, color: isOpen ? AppColors.success : AppColors.error, fontWeight: FontWeight.w600)),
         ]),
         const SizedBox(height: 6),
-        Text(r.description,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-                fontSize: 12, color: Colors.black87, height: 1.4)),
+        Text(r.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: texts.bodyMedium),
         const SizedBox(height: 8),
         if (!isOpen)
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.red.shade50,
+              color: AppColors.error.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.red.shade200),
             ),
             child: Row(children: [
-              Icon(Icons.info_outline, size: 16, color: Colors.red.shade600),
+              const Icon(Icons.info_outline, size: 16, color: AppColors.error),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                     'Ce restaurant est actuellement fermé. '
                     'Commandes autorisées uniquement durant les heures ouvrables.',
-                    style: TextStyle(fontSize: 11, color: Colors.red.shade700)),
+                    style: const TextStyle(fontSize: 11, color: AppColors.error)),
               ),
             ]),
           )
         else
           OutlinedButton.icon(
             onPressed: () {},
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.orange,
-              side: const BorderSide(color: Colors.orange),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
-            ),
             icon: const Icon(Icons.phone_outlined, size: 14),
             label: Text(r.phone, style: const TextStyle(fontSize: 11)),
           ),
         const SizedBox(height: 10),
-        // Bouton infos & horaires détaillés
         GestureDetector(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => RestaurantDetailPage(restaurant: r)),
-          ),
+          onTap: () {
+            HapticFeedback.selectionClick();
+            Navigator.push(context, MaterialPageRoute(builder: (_) => RestaurantDetailPage(restaurant: r)));
+          },
           child: Row(children: [
-            const Icon(Icons.info_outline, size: 15, color: Colors.grey),
+            Icon(Icons.info_outline, size: 15, color: texts.bodySmall?.color),
             const SizedBox(width: 6),
             Text('Infos & horaires détaillés',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                    decoration: TextDecoration.underline)),
+                style: texts.bodySmall?.copyWith(decoration: TextDecoration.underline)),
             const Spacer(),
-            const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+            Icon(Icons.chevron_right_rounded, size: 16, color: texts.bodySmall?.color),
           ]),
         ),
       ]),
@@ -564,7 +455,57 @@ class _RestaurantProfilePageState extends State<RestaurantProfilePage>
   }
 }
 
-// STICKY DELEGATE é recherche + TabBar épinglées
+// SKELETON DE CHARGEMENT
+class _RestaurantSkeleton extends StatelessWidget {
+  const _RestaurantSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: EdgeInsets.zero,
+      children: [
+        SkeletonLoader.image(width: double.infinity, height: 200, radius: BorderRadius.zero),
+        Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SkeletonLoader.text(width: 180, height: 22),
+            const SizedBox(height: AppSpacing.sm),
+            SkeletonLoader.text(width: 240, height: 14),
+            const SizedBox(height: AppSpacing.lg),
+            SkeletonLoader.list(count: 3, itemHeight: 90),
+          ]),
+        ),
+      ],
+    );
+  }
+}
+
+// ÉTAT VIDE — recherche sans résultat
+class _EmptySearch extends StatelessWidget {
+  final String query;
+  const _EmptySearch({required this.query});
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = AppTextStyles.textTheme(Theme.of(context).brightness);
+    return Padding(
+      padding: const EdgeInsets.only(top: 40),
+      child: Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.search_off_rounded, size: 44, color: texts.bodySmall?.color),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            query.isEmpty ? 'Aucun plat disponible' : 'Aucun plat trouvé pour "$query"',
+            style: texts.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+        ]),
+      ),
+    ).animate().fadeIn(duration: 300.ms);
+  }
+}
+
+// STICKY DELEGATE — recherche + TabBar épinglées
 class _StickyBarDelegate extends SliverPersistentHeaderDelegate {
   final TabBar tabBar;
   final Color bgColor;
@@ -590,31 +531,25 @@ class _StickyBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => _searchH + tabBar.preferredSize.height;
 
   @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       color: bgColor,
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.md, 6, AppSpacing.md, 4),
           child: TextField(
             controller: searchCtrl,
             onChanged: onSearch,
             decoration: InputDecoration(
               hintText: 'Rechercher un plat...',
-              prefixIcon:
-                  const Icon(Icons.search, color: Colors.orange, size: 20),
-              suffixIcon: searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, size: 18),
-                      onPressed: onClear)
-                  : null,
+              prefixIcon: const Icon(Icons.search_rounded, color: AppColors.accent, size: 20),
+              suffixIcon:
+                  searchQuery.isNotEmpty ? IconButton(icon: const Icon(Icons.clear_rounded, size: 18), onPressed: onClear) : null,
               filled: true,
-              fillColor: Colors.white,
+              fillColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
               contentPadding: const EdgeInsets.symmetric(vertical: 0),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(25),
-                  borderSide: BorderSide.none),
+              border: OutlineInputBorder(borderRadius: AppRadius.chipRadius, borderSide: BorderSide.none),
             ),
           ),
         ),
@@ -624,8 +559,7 @@ class _StickyBarDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  bool shouldRebuild(_StickyBarDelegate old) =>
-      bgColor != old.bgColor || searchQuery != old.searchQuery;
+  bool shouldRebuild(_StickyBarDelegate old) => bgColor != old.bgColor || searchQuery != old.searchQuery;
 }
 
 // ONGLET AVIS
@@ -655,13 +589,9 @@ class _ReviewsTabState extends State<_ReviewsTab> {
     int existingStars = 0;
     if (uid != null) {
       try {
-        final doc = await FirebaseFirestore.instance
-            .collection('ratings')
-            .doc('${widget.restaurantId}_$uid')
-            .get();
-        if (doc.exists) {
-          existingStars = (doc.data()?['stars'] as int?) ?? 0;
-        }
+        final doc =
+            await FirebaseFirestore.instance.collection('ratings').doc('${widget.restaurantId}_$uid').get();
+        if (doc.exists) existingStars = (doc.data()?['stars'] as int?) ?? 0;
       } catch (_) {}
     }
 
@@ -678,13 +608,11 @@ class _ReviewsTabState extends State<_ReviewsTab> {
     if (uid == null) return;
 
     final score = stars * 4;
+    HapticFeedback.lightImpact();
     setState(() => _userStars = stars);
 
     try {
-      await FirebaseFirestore.instance
-          .collection('ratings')
-          .doc('${widget.restaurantId}_$uid')
-          .set({
+      await FirebaseFirestore.instance.collection('ratings').doc('${widget.restaurantId}_$uid').set({
         'restaurantId': widget.restaurantId,
         'clientUid': uid,
         'stars': stars,
@@ -695,10 +623,9 @@ class _ReviewsTabState extends State<_ReviewsTab> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Merci ! Vous avez donné la note de $score/20'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppColors.accent,
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.button)),
           duration: const Duration(seconds: 2),
         ));
       }
@@ -707,7 +634,7 @@ class _ReviewsTabState extends State<_ReviewsTab> {
         setState(() => _userStars = 0);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Erreur : $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ));
       }
@@ -717,33 +644,29 @@ class _ReviewsTabState extends State<_ReviewsTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(
-          child: CircularProgressIndicator(color: Colors.orange));
+      return Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: SkeletonLoader.list(count: 4, itemHeight: 84),
+      );
     }
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
+    final texts = AppTextStyles.textTheme(Theme.of(context).brightness);
 
     return ListView(
-      padding: const EdgeInsets.only(top: 12, left: 14, right: 14, bottom: 100),
+      padding: const EdgeInsets.only(top: 12, left: AppSpacing.md, right: AppSpacing.md, bottom: 100),
       children: [
         if (uid != null) ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.orange.shade200),
+              color: AppColors.accent.withValues(alpha: 0.06),
+              borderRadius: AppRadius.cardRadius,
             ),
             child: Column(children: [
               Text(
-                _userStars == 0
-                    ? 'Notez ${widget.restaurantName}'
-                    : 'Votre note : ${_userStars * 4}/20',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: _userStars == 0 ? Colors.black87 : Colors.orange,
-                ),
+                _userStars == 0 ? 'Notez ${widget.restaurantName}' : 'Votre note : ${_userStars * 4}/20',
+                style: texts.titleMedium?.copyWith(color: _userStars == 0 ? null : AppColors.accent),
               ),
               const SizedBox(height: 10),
               Row(
@@ -754,42 +677,40 @@ class _ReviewsTabState extends State<_ReviewsTab> {
                     onTap: () => _submitRating(i + 1),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Icon(
-                        filled
-                            ? Icons.star_rounded
-                            : Icons.star_outline_rounded,
-                        color: filled ? Colors.amber : Colors.grey.shade400,
-                        size: 40,
-                      ),
+                      child: Icon(filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                              color: filled ? const Color(0xFFFFB020) : AppColors.disabledLight, size: 40)
+                          .animate(target: filled ? 1 : 0)
+                          .scaleXY(end: 1.15, duration: 120.ms)
+                          .then()
+                          .scaleXY(end: 1, duration: 100.ms),
                     ),
                   );
                 }),
               ),
               if (_userStars > 0) ...[
                 const SizedBox(height: 6),
-                Text('Appuyez sur une étoile pour modifier',
-                    style:
-                        TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                Text('Appuyez sur une étoile pour modifier', style: texts.labelSmall),
               ],
             ]),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
         ],
         if (_reviews.isEmpty)
           Center(
             child: Padding(
               padding: const EdgeInsets.only(top: 20),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.reviews_outlined,
-                    size: 48, color: Colors.grey.shade300),
-                const SizedBox(height: 8),
-                const Text("Aucun avis pour l'instant",
-                    style: TextStyle(color: Colors.grey)),
+                Icon(Icons.reviews_outlined, size: 44, color: texts.bodySmall?.color),
+                const SizedBox(height: AppSpacing.sm),
+                Text("Aucun avis pour l'instant", style: texts.bodyMedium),
               ]),
             ),
           )
         else
-          ..._reviews.map((rev) => _ReviewCard(review: rev)),
+          ..._reviews.asMap().entries.map((e) => _ReviewCard(review: e.value)
+              .animate()
+              .fadeIn(duration: 250.ms, delay: (e.key * 40).ms)
+              .slideY(begin: 0.04, end: 0)),
       ],
     );
   }
@@ -801,57 +722,45 @@ class _ReviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 6,
-                offset: const Offset(0, 2))
-          ]),
+        color: Theme.of(context).cardColor,
+        borderRadius: AppRadius.cardRadius,
+        boxShadow: AppShadows.light(brightness),
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           CircleAvatar(
             radius: 20,
-            backgroundColor: Colors.orange.shade100,
-            backgroundImage: review.clientImageUrl != null
-                ? NetworkImage(review.clientImageUrl!)
-                : null,
+            backgroundColor: AppColors.accent.withValues(alpha: 0.12),
+            backgroundImage: review.clientImageUrl != null ? NetworkImage(review.clientImageUrl!) : null,
             child: review.clientImageUrl == null
                 ? Text(review.clientName[0].toUpperCase(),
-                    style: const TextStyle(
-                        color: Colors.orange, fontWeight: FontWeight.bold))
+                    style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold))
                 : null,
           ),
           const SizedBox(width: 10),
           Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(review.clientName,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 13)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(review.clientName, style: texts.titleSmall),
               Row(
                   children: List.generate(
                       5,
-                      (i) => Icon(
-                          i < review.rating ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                          size: 13))),
+                      (i) => Icon(i < review.rating ? Icons.star_rounded : Icons.star_border_rounded,
+                          color: const Color(0xFFFFB020), size: 13))),
             ]),
           ),
           if (review.createdAt != null)
-            Text(
-                '${review.createdAt!.day}/${review.createdAt!.month}/${review.createdAt!.year}',
-                style: const TextStyle(fontSize: 10, color: Colors.grey)),
+            Text('${review.createdAt!.day}/${review.createdAt!.month}/${review.createdAt!.year}',
+                style: texts.labelSmall),
         ]),
         if (review.comment.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Text(review.comment,
-              style: const TextStyle(fontSize: 13, height: 1.4)),
+          Text(review.comment, style: texts.bodyMedium),
         ],
       ]),
     );
@@ -863,19 +772,16 @@ class _PlatCard extends StatelessWidget {
   final Plat plat;
   final Restaurant restaurant;
   final bool isRestaurantOpen;
-  const _PlatCard(
-      {required this.plat,
-      required this.restaurant,
-      required this.isRestaurantOpen});
+  const _PlatCard({required this.plat, required this.restaurant, required this.isRestaurantOpen});
 
   void _addToCart(BuildContext context, CartProvider cart) {
     if (!isRestaurantOpen) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
-            'Ce restaurant est actuellement fermé. Commandes autorisées uniquement durant les heures ouvrables.'),
-        backgroundColor: Colors.red,
+            'Ce restaurant est fermé pour le moment. Horaires : ${restaurant.openingHours}.'),
+        backgroundColor: AppColors.error,
         behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 3),
+        duration: const Duration(seconds: 3),
       ));
       return;
     }
@@ -890,12 +796,11 @@ class _PlatCard extends StatelessWidget {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(SnackBar(
-        content: Text(
-            added ? '${plat.name} ajouté !' : 'Maximum 10 articles atteint'),
-        backgroundColor: added ? Colors.green.shade600 : Colors.orange.shade700,
+        content: Text(added ? '${plat.name} ajouté !' : 'Maximum 10 articles atteint'),
+        backgroundColor: added ? AppColors.success : AppColors.warning,
         duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.button)),
       ));
   }
 
@@ -923,86 +828,64 @@ class _PlatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 3))
-        ],
+        borderRadius: AppRadius.cardRadius,
+        boxShadow: AppShadows.light(brightness),
       ),
       // L'image est HORS de l'InkWell pour éviter le conflit d'arène des gestes
       child: Row(children: [
-        // Image é tap = visualiseur plein écran
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () =>
-              ImageViewer.open(context, plat.img, 'plat_img_${plat.name}'),
+          onTap: () => ImageViewer.open(context, plat.img, 'plat_img_${plat.name}'),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: _AnyImage(
-                  img: plat.img, width: 90, height: 90, fit: BoxFit.cover),
+              borderRadius: AppRadius.imageRadius,
+              child: _AnyImage(img: plat.img, width: 90, height: 90, fit: BoxFit.cover),
             ),
           ),
         ),
-        // Infos + bouton é tap = feuille détail
         Expanded(
           child: InkWell(
-            borderRadius:
-                const BorderRadius.horizontal(right: Radius.circular(18)),
+            borderRadius: const BorderRadius.horizontal(right: Radius.circular(AppRadius.card)),
             onTap: () => _showPlatDetail(context),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(0, 12, 12, 12),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(plat.name,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 15)),
-                    const SizedBox(height: 4),
-                    Text(plat.description,
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.grey, height: 1.4),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 8),
-                    Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(plat.price,
-                                  style: const TextStyle(
-                                      color: Colors.orange,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15)),
-                            ),
-                          ),
-                          Consumer<CartProvider>(
-                            builder: (ctx, cart, _) => GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () => _addToCart(ctx, cart),
-                              child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                      color: isRestaurantOpen
-                                          ? Colors.orange
-                                          : Colors.grey.shade400,
-                                      shape: BoxShape.circle),
-                                  child: const Icon(Icons.add,
-                                      color: Colors.white, size: 18)),
-                            ),
-                          ),
-                        ]),
-                  ]),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(plat.name, style: texts.titleMedium),
+                const SizedBox(height: 4),
+                Text(plat.description, style: texts.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 8),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(plat.price, style: AppTextStyles.priceAccent(size: 15)),
+                    ),
+                  ),
+                  Consumer<CartProvider>(
+                    builder: (ctx, cart, _) => GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _addToCart(ctx, cart),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isRestaurantOpen ? AppColors.accent : AppColors.disabledLight,
+                          shape: BoxShape.circle,
+                          boxShadow: isRestaurantOpen ? AppShadows.strong(brightness) : null,
+                        ),
+                        child: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+                      ),
+                    ),
+                  ),
+                ]),
+              ]),
             ),
           ),
         ),
@@ -1011,38 +894,35 @@ class _PlatCard extends StatelessWidget {
   }
 }
 
-// WIDGETS RéUTILISABLES
+// WIDGETS RÉUTILISABLES
 class _AnyImage extends StatelessWidget {
   final String img;
   final double? width;
   final double? height;
   final BoxFit fit;
-  const _AnyImage(
-      {required this.img, this.width, this.height, this.fit = BoxFit.cover});
+  const _AnyImage({required this.img, this.width, this.height, this.fit = BoxFit.cover});
 
   @override
   Widget build(BuildContext context) {
     final fallback = Container(
         width: width,
         height: height,
-        color: Colors.orange.shade100,
-        child: const Center(
-            child: Icon(Icons.fastfood, color: Colors.orange, size: 30)));
+        color: AppColors.accent.withValues(alpha: 0.08),
+        child: const Center(child: Icon(Icons.fastfood_rounded, color: AppColors.accent, size: 30)));
 
     if (img.isEmpty) return fallback;
     if (img.startsWith('http')) {
-      return Image.network(img,
-          width: width,
-          height: height,
-          fit: fit,
-          errorBuilder: (_, __, ___) => fallback);
+      return CachedNetworkImage(
+        imageUrl: img,
+        width: width,
+        height: height,
+        fit: fit,
+        placeholder: (_, __) => SkeletonLoader.image(width: width, height: height ?? 90, radius: BorderRadius.zero),
+        errorWidget: (_, __, ___) => fallback,
+      );
     }
     if (img.startsWith('assets/')) {
-      return Image.asset(img,
-          width: width,
-          height: height,
-          fit: fit,
-          errorBuilder: (_, __, ___) => fallback);
+      return Image.asset(img, width: width, height: height, fit: fit, errorBuilder: (_, __, ___) => fallback);
     }
     return fallback;
   }
@@ -1053,23 +933,25 @@ class _CircleBtn extends StatelessWidget {
   final String? badge;
   final VoidCallback onTap;
   final Color? color;
-  const _CircleBtn(
-      {required this.icon, required this.onTap, this.badge, this.color});
+  const _CircleBtn({required this.icon, required this.onTap, this.badge, this.color});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
         child: Container(
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.35),
+              color: AppColors.imageOverlay.withValues(alpha: 0.35),
               shape: BoxShape.circle,
-              border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.3), width: 1)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1)),
           child: badge != null
               ? Badge(
                   label: Text(badge!),
+                  backgroundColor: AppColors.accent,
                   child: Icon(icon, color: color ?? Colors.white, size: 20))
               : Icon(icon, color: color ?? Colors.white, size: 20),
         ),
@@ -1077,21 +959,26 @@ class _CircleBtn extends StatelessWidget {
 }
 
 class _CartFAB extends StatelessWidget {
+  const _CartFAB();
+
   @override
   Widget build(BuildContext context) {
     return Consumer<CartProvider>(
       builder: (context, cart, _) {
         if (cart.itemCount == 0) return const SizedBox.shrink();
         return FloatingActionButton.extended(
-          onPressed: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const PanierPage())),
-          backgroundColor: Colors.orange,
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const PanierPage()));
+          },
+          backgroundColor: AppColors.accent,
           foregroundColor: Colors.white,
-          icon: const Icon(Icons.shopping_cart),
-          label: Text('${cart.itemCount} art. é ${cart.totalPriceFormatted}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-              overflow: TextOverflow.ellipsis),
-        );
+          icon: const Icon(Icons.shopping_cart_rounded),
+          label: Text('${cart.itemCount} art. · ${cart.totalPriceFormatted}',
+              style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+        )
+            .animate(key: ValueKey(cart.itemCount))
+            .scaleXY(begin: 0.85, end: 1, duration: 220.ms, curve: Curves.elasticOut);
       },
     );
   }
@@ -1101,15 +988,12 @@ class _StatChip extends StatelessWidget {
   final IconData icon;
   final Color color;
   final String label;
-  const _StatChip(
-      {required this.icon, required this.color, required this.label});
+  const _StatChip({required this.icon, required this.color, required this.label});
 
   @override
-  Widget build(BuildContext context) =>
-      Row(mainAxisSize: MainAxisSize.min, children: [
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 16, color: color),
         const SizedBox(width: 4),
-        Text(label,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
       ]);
 }

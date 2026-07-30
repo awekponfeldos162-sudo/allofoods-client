@@ -1,7 +1,10 @@
 // lib/pages/PanierPage.dart
 // ? 3 onglets : Panier | Favoris | Historique
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_application_2/favorites_provider.dart';
 import 'package:flutter_application_2/services/payment_service.dart';
 import 'package:provider/provider.dart';
@@ -12,6 +15,8 @@ import '../models/cart_model.dart';
 import '../models/restaurant_model.dart';
 import '../models/review_model.dart';
 import '../services/receipt_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/premium/premium.dart';
 import 'adressePage.dart';
 import 'PaiementPage.dart';
 import 'RestaurantProfilPage.dart';
@@ -43,7 +48,7 @@ class _PanierPageState extends State<PanierPage>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cart = context.watch<CartProvider>();
-    final barColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final barColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
 
     // true = page pushée (a un back) ; false = tab principal dans le PageView
     final isPushed = ModalRoute.of(context)?.canPop ?? false;
@@ -55,7 +60,7 @@ class _PanierPageState extends State<PanierPage>
         top: isPushed,
         bottom: false,
         child: Column(children: [
-          // Header retour é visible seulement quand pushée
+          // Header retour — visible seulement quand pushée
           if (isPushed)
             Container(
               color: barColor,
@@ -87,9 +92,9 @@ class _PanierPageState extends State<PanierPage>
             color: barColor,
             child: TabBar(
               controller: _tabs,
-              labelColor: Colors.orange,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: Colors.orange,
+              labelColor: AppColors.accent,
+              unselectedLabelColor: AppColors.textSecondaryLight,
+              indicatorColor: AppColors.accent,
               indicatorWeight: 3,
               tabs: [
                 Tab(
@@ -105,7 +110,7 @@ class _PanierPageState extends State<PanierPage>
                           padding: const EdgeInsets.symmetric(
                               horizontal: 5, vertical: 1),
                           decoration: BoxDecoration(
-                              color: Colors.orange,
+                              color: AppColors.accent,
                               borderRadius: BorderRadius.circular(10)),
                           child: Text(
                             cart.itemCount > 99 ? '99+' : '${cart.itemCount}',
@@ -146,7 +151,7 @@ class _PanierPageState extends State<PanierPage>
   }
 }
 
-// ONGLET 1 é PANIER
+// ONGLET 1 — PANIER
 class _CartTab extends StatelessWidget {
   const _CartTab();
 
@@ -165,8 +170,10 @@ class _CartTab extends StatelessWidget {
                     child: ListView.builder(
                       padding: const EdgeInsets.fromLTRB(15, 15, 15, 0),
                       itemCount: cart.items.length,
-                      itemBuilder: (ctx, i) =>
-                          _CartItemCard(index: i, item: cart.items[i]),
+                      itemBuilder: (ctx, i) => _CartItemCard(index: i, item: cart.items[i])
+                          .animate()
+                          .fadeIn(duration: 250.ms, delay: (i * 40).ms)
+                          .slideX(begin: 0.05, end: 0),
                     ),
                   ),
                   ConstrainedBox(
@@ -174,7 +181,7 @@ class _CartTab extends StatelessWidget {
                       maxHeight: MediaQuery.of(context).size.height * 0.55,
                     ),
                     child: _Summary(cart: cart),
-                  ),
+                  ).animate().slideY(begin: 0.15, end: 0, duration: 350.ms, curve: Curves.easeOutCubic),
                 ]),
         );
       },
@@ -182,7 +189,7 @@ class _CartTab extends StatelessWidget {
   }
 }
 
-// ONGLET 2 é FAVORIS
+// ONGLET 2 — FAVORIS
 class _FavoritesTab extends StatelessWidget {
   const _FavoritesTab();
 
@@ -193,22 +200,19 @@ class _FavoritesTab extends StatelessWidget {
         final ids = favs.favRestaurants.toList();
 
         if (ids.isEmpty) {
+          final texts = AppTextStyles.textTheme(Theme.of(context).brightness);
           return Center(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Container(
-                padding: const EdgeInsets.all(28),
-                decoration: BoxDecoration(
-                    color: Colors.red.shade50, shape: BoxShape.circle),
-                child: Icon(Icons.favorite_outline,
-                    size: 56, color: Colors.red.shade300),
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.08), shape: BoxShape.circle),
+                child: const Icon(Icons.favorite_outline_rounded, size: 52, color: AppColors.error),
               ),
-              const SizedBox(height: 20),
-              Text(AppLocalizations.of(context).noFavorites,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.lg),
+              Text(AppLocalizations.of(context).noFavorites, style: texts.headlineSmall),
+              const SizedBox(height: AppSpacing.xs),
               Text(AppLocalizations.of(context).addFavoritesHint,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                  textAlign: TextAlign.center, style: texts.bodyMedium),
             ]),
           );
         }
@@ -217,8 +221,10 @@ class _FavoritesTab extends StatelessWidget {
           future: _loadFavRestaurants(ids),
           builder: (_, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(
-                  child: CircularProgressIndicator(color: Colors.orange));
+              return Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: SkeletonLoader.list(count: 4, itemHeight: 90),
+              );
             }
             final restaurants = snap.data ?? [];
             if (restaurants.isEmpty) {
@@ -233,7 +239,7 @@ class _FavoritesTab extends StatelessWidget {
               itemBuilder: (_, i) => _FavCard(
                 restaurant: restaurants[i],
                 onRemove: () => favs.toggleRestaurant(restaurants[i].id),
-              ),
+              ).animate().fadeIn(duration: 250.ms, delay: (i * 40).ms).slideX(begin: 0.05, end: 0),
             );
           },
         );
@@ -267,63 +273,46 @@ class _FavCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => RestaurantProfilePage(restaurant: restaurant))),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 3))
-          ],
-        ),
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: PremiumCard(
+        padding: EdgeInsets.zero,
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => RestaurantProfilePage(restaurant: restaurant))),
         child: Row(children: [
           ClipRRect(
-            borderRadius:
-                const BorderRadius.horizontal(left: Radius.circular(16)),
+            borderRadius: const BorderRadius.horizontal(left: Radius.circular(AppRadius.card)),
             child: _Img(img: restaurant.coverImg, width: 90, height: 90),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(restaurant.name,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 15)),
-                    const SizedBox(height: 2),
-                    Text(restaurant.style,
-                        style: const TextStyle(
-                            color: Colors.orange, fontSize: 12)),
-                    const SizedBox(height: 6),
-                    Row(children: [
-                      const Icon(Icons.star, size: 13, color: Colors.amber),
-                      Text(' ${restaurant.rating.toStringAsFixed(1)}',
-                          style: const TextStyle(fontSize: 12)),
-                      const SizedBox(width: 10),
-                      const Icon(Icons.timer, size: 13, color: Colors.grey),
-                      Text(' ${restaurant.deliveryTime} min',
-                          style: const TextStyle(
-                              fontSize: 12, color: Colors.grey)),
-                    ]),
-                  ]),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(restaurant.name, style: texts.titleMedium),
+                const SizedBox(height: 2),
+                Text(restaurant.style, style: const TextStyle(color: AppColors.accent, fontSize: 12)),
+                const SizedBox(height: 6),
+                Row(children: [
+                  const Icon(Icons.star_rounded, size: 14, color: Color(0xFFFFB020)),
+                  Text(' ${restaurant.rating.toStringAsFixed(1)}', style: texts.labelSmall),
+                  const SizedBox(width: 10),
+                  Icon(Icons.timer_rounded, size: 13, color: texts.bodySmall?.color),
+                  Text(' ${restaurant.deliveryTime} min', style: texts.bodySmall),
+                ]),
+              ]),
             ),
           ),
           GestureDetector(
-            onTap: onRemove,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 14),
-              child: Icon(Icons.favorite, color: Colors.red.shade400, size: 22),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onRemove();
+            },
+            child: const Padding(
+              padding: EdgeInsets.only(right: 14),
+              child: Icon(Icons.favorite_rounded, color: AppColors.error, size: 22),
             ),
           ),
         ]),
@@ -534,8 +523,10 @@ class _HistoryDeliveredTab extends StatelessWidget {
           .snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(
-              child: CircularProgressIndicator(color: Colors.orange));
+          return Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: SkeletonLoader.list(count: 4, itemHeight: 100),
+          );
         }
         final docs = (snap.data?.docs ?? [])
             .where((d) =>
@@ -571,8 +562,8 @@ class _HistoryDeliveredTab extends StatelessWidget {
                           padding: const EdgeInsets.only(left: 20),
                           margin: const EdgeInsets.only(bottom: 10),
                           decoration: BoxDecoration(
-                            color: Colors.red.shade400,
-                            borderRadius: BorderRadius.circular(16),
+                            color: AppColors.error,
+                            borderRadius: AppRadius.cardRadius,
                           ),
                           child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -591,7 +582,7 @@ class _HistoryDeliveredTab extends StatelessWidget {
                           onTap: () => _showDeliveredDetail(
                               context, data, doc.id),
                           onDelete: () => onDelete(doc.id),
-                        ),
+                        ).animate().fadeIn(duration: 250.ms).slideX(begin: 0.04, end: 0),
                       );
                     }),
                     const SizedBox(height: 8),
@@ -635,8 +626,10 @@ class _HistoryCancelledTab extends StatelessWidget {
           .snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(
-              child: CircularProgressIndicator(color: Colors.orange));
+          return Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: SkeletonLoader.list(count: 4, itemHeight: 100),
+          );
         }
         final docs = snap.data?.docs ?? [];
         if (docs.isEmpty) return const _HisEmptyCancelled();
@@ -646,12 +639,12 @@ class _HistoryCancelledTab extends StatelessWidget {
           children: [
             _HisCancelledSummaryBar(total: docs.length),
             const SizedBox(height: 16),
-            ...docs.map((doc) {
-              final data = doc.data() as Map<String, dynamic>;
+            ...docs.asMap().entries.map((entry) {
+              final data = entry.value.data() as Map<String, dynamic>;
               return _HisCancelledCard(
                 data: data,
-                onTap: () => _showCancelledDetail(context, data, doc.id),
-              );
+                onTap: () => _showCancelledDetail(context, data, entry.value.id),
+              ).animate().fadeIn(duration: 250.ms, delay: (entry.key * 40).ms).slideX(begin: 0.04, end: 0);
             }),
             const SizedBox(height: 16),
           ],
@@ -686,34 +679,30 @@ class _HisSummaryBar extends StatelessWidget {
   final int total;
   const _HisSummaryBar({required this.total});
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.grey.shade200),
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: AppRadius.cardRadius,
+        boxShadow: AppShadows.light(brightness),
+      ),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), shape: BoxShape.circle),
+          child: const Icon(Icons.check_circle_outline_rounded, color: AppColors.success, size: 20),
         ),
-        child: Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-                color: Colors.grey.shade100, shape: BoxShape.circle),
-            child: const Icon(Icons.check_circle_outline,
-                color: Colors.black87, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(
-                AppLocalizations.of(context).deliveriesCount(total),
-                style: const TextStyle(
-                    color: Colors.black87,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold)),
-            Text(AppLocalizations.of(context).deliveredOrdersOnly,
-                style: const TextStyle(color: Colors.black54, fontSize: 11)),
-          ]),
+        const SizedBox(width: 12),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(AppLocalizations.of(context).deliveriesCount(total), style: texts.titleMedium),
+          Text(AppLocalizations.of(context).deliveredOrdersOnly, style: texts.labelSmall),
         ]),
-      );
+      ]),
+    );
+  }
 }
 
 class _HisMonthLabel extends StatelessWidget {
@@ -723,11 +712,9 @@ class _HisMonthLabel extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Text(label.toUpperCase(),
-            style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey.shade500,
-                letterSpacing: 1.2)),
+            style: AppTextStyles.textTheme(Theme.of(context).brightness)
+                .labelSmall
+                ?.copyWith(letterSpacing: 1.2)),
       );
 }
 
@@ -740,7 +727,8 @@ class _HisOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
     final items = (data['items'] as List?)?.cast<Map>() ?? [];
     final ts = data['createdAt'] as Timestamp?;
     final totalAmount = _hNum(data['totalAmount']);
@@ -749,112 +737,67 @@ class _HisOrderCard extends StatelessWidget {
     final appAmount =
         delivPayCash ? totalAmount - _hNum(data['deliveryFee']) : totalAmount;
 
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onDelete,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 3))
-          ],
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.restaurant,
-                  color: Colors.orange, size: 18),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(_hStr(data['restaurantName']),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14),
-                        overflow: TextOverflow.ellipsis),
-                    Text(ts != null ? _hDate(ts) : '—',
-                        style: TextStyle(
-                            fontSize: 11, color: Colors.grey.shade500)),
-                  ]),
-            ),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.check_circle_outline,
-                    color: Colors.green, size: 12),
-                const SizedBox(width: 4),
-                Text(AppLocalizations.of(context).deliveredBadge,
-                    style: const TextStyle(
-                        color: Colors.green,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold)),
-              ]),
-            ),
-          ]),
-          if (items.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-                items
-                        .take(3)
-                        .map((i) => '${i['quantity']}× ${i['name']}')
-                        .join(' • ') +
-                    (items.length > 3
-                        ? ' +${items.length - 3}'
-                        : ''),
-                style: TextStyle(
-                    fontSize: 12, color: Colors.grey.shade500),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
-          ],
-          const SizedBox(height: 8),
-          Row(children: [
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: GestureDetector(
+        onLongPress: onDelete,
+        child: PremiumCard(
+          onTap: onTap,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              const Icon(Icons.phone_android,
-                  size: 11, color: Colors.black54),
-              const SizedBox(width: 4),
-              Text('App : $appAmount FCFA',
-                  style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w600)),
-            ]),
-            if (delivPayCash) ...[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration:
+                    BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.restaurant_rounded, color: AppColors.accent, size: 18),
+              ),
               const SizedBox(width: 10),
-              Row(children: [
-                const Icon(Icons.money, size: 11, color: Colors.black54),
-                const SizedBox(width: 4),
-                Text(
-                    'Cash : ${_hNum(data['deliveryFee'])} FCFA',
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w600)),
-              ]),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(_hStr(data['restaurantName']), style: texts.titleSmall, overflow: TextOverflow.ellipsis),
+                  Text(ts != null ? _hDate(ts) : '—', style: texts.labelSmall),
+                ]),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: AppRadius.chipRadius),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.check_circle_outline_rounded, color: AppColors.success, size: 12),
+                  const SizedBox(width: 4),
+                  Text(AppLocalizations.of(context).deliveredBadge,
+                      style: const TextStyle(color: AppColors.success, fontSize: 11, fontWeight: FontWeight.bold)),
+                ]),
+              ),
+            ]),
+            if (items.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                  items.take(3).map((i) => '${i['quantity']}× ${i['name']}').join(' • ') +
+                      (items.length > 3 ? ' +${items.length - 3}' : ''),
+                  style: texts.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
             ],
-            const Spacer(),
-            Text('$totalAmount FCFA',
-                style: const TextStyle(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14)),
+            const SizedBox(height: 8),
+            Row(children: [
+              Row(children: [
+                Icon(Icons.phone_android_rounded, size: 11, color: texts.bodySmall?.color),
+                const SizedBox(width: 4),
+                Text('App : $appAmount FCFA', style: texts.labelMedium),
+              ]),
+              if (delivPayCash) ...[
+                const SizedBox(width: 10),
+                Row(children: [
+                  Icon(Icons.money_rounded, size: 11, color: texts.bodySmall?.color),
+                  const SizedBox(width: 4),
+                  Text('Cash : ${_hNum(data['deliveryFee'])} FCFA', style: texts.labelMedium),
+                ]),
+              ],
+              const Spacer(),
+              Text('$totalAmount FCFA', style: texts.titleSmall),
+            ]),
           ]),
-        ]),
+        ),
       ),
     );
   }
@@ -868,6 +811,8 @@ class _HisOrderDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
     final items = (data['items'] as List?)?.cast<Map>() ?? [];
     final total = _hNum(data['totalAmount']);
     final delivFee = _hNum(data['deliveryFee']);
@@ -882,9 +827,9 @@ class _HisOrderDetailSheet extends StatelessWidget {
 
     return Container(
       height: double.infinity,
-      decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      decoration: BoxDecoration(
+          color: brightness == Brightness.dark ? AppColors.surfaceDark : AppColors.surfaceLight,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.card))),
       padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom + 20),
       child: Column(children: [
@@ -893,7 +838,7 @@ class _HisOrderDetailSheet extends StatelessWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: brightness == Brightness.dark ? AppColors.dividerDark : AppColors.dividerLight,
                 borderRadius: BorderRadius.circular(2))),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
@@ -902,27 +847,15 @@ class _HisOrderDetailSheet extends StatelessWidget {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_hStr(data['restaurantName']),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 17)),
-                    Text('Commande #$shortId',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey.shade500)),
+                    Text(_hStr(data['restaurantName']), style: texts.headlineSmall),
+                    Text('Commande #$shortId', style: texts.labelSmall),
                   ]),
             ),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: Colors.green.withValues(alpha: 0.3))),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: AppRadius.chipRadius),
               child: Text(AppLocalizations.of(context).statusDeliveredBadge,
-                  style: const TextStyle(
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12)),
+                  style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 12)),
             ),
           ]),
         ),
@@ -933,9 +866,7 @@ class _HisOrderDetailSheet extends StatelessWidget {
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-              Text(AppLocalizations.of(context).itemsLabel,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 13)),
+              Text(AppLocalizations.of(context).itemsLabel, style: texts.titleSmall),
               const SizedBox(height: 8),
               ...items.map((item) => Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
@@ -943,28 +874,16 @@ class _HisOrderDetailSheet extends StatelessWidget {
                       Container(
                         width: 26,
                         height: 26,
-                        decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(8)),
+                        decoration:
+                            BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
                         child: Center(
                           child: Text('${item['quantity']}',
-                              style: const TextStyle(
-                                  color: Colors.orange,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12)),
+                              style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 12)),
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Expanded(
-                          child: Text(
-                              _hStr(item['name']),
-                              style: const TextStyle(fontSize: 13),
-                              overflow: TextOverflow.ellipsis)),
-                      Text(
-                          '${_hNum(item['price']) * _hNum(item['quantity'])} FCFA',
-                          style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500)),
+                      Expanded(child: Text(_hStr(item['name']), style: texts.bodyMedium, overflow: TextOverflow.ellipsis)),
+                      Text('${_hNum(item['price']) * _hNum(item['quantity'])} FCFA', style: AppTextStyles.price(brightness, size: 13, weight: FontWeight.w500)),
                     ]),
                   )),
               const SizedBox(height: 14),
@@ -981,9 +900,7 @@ class _HisOrderDetailSheet extends StatelessWidget {
               const Divider(height: 16),
               _DetailRow(AppLocalizations.of(context).totalPaidApp, '$total FCFA', bold: true),
               const SizedBox(height: 14),
-              Text(AppLocalizations.of(context).detailsLabel,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 13)),
+              Text(AppLocalizations.of(context).detailsLabel, style: texts.titleSmall),
               const SizedBox(height: 8),
               _DetailRow(AppLocalizations.of(context).address, _hStr(data['deliveryAddress'])),
               _DetailRow(AppLocalizations.of(context).paymentMethodLabel, _hPayLabel(context, payment)),
@@ -1027,38 +944,32 @@ class _HisCancelledSummaryBar extends StatelessWidget {
   final int total;
   const _HisCancelledSummaryBar({required this.total});
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.grey.shade200),
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: AppRadius.cardRadius,
+        boxShadow: AppShadows.light(brightness),
+      ),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.1), shape: BoxShape.circle),
+          child: const Icon(Icons.replay_outlined, color: AppColors.error, size: 20),
         ),
-        child: Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-                color: Colors.grey.shade100, shape: BoxShape.circle),
-            child: const Icon(Icons.replay_outlined,
-                color: Colors.black87, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-              Text(
-                  AppLocalizations.of(context).failedOrdersCount(total),
-                  style: const TextStyle(
-                      color: Colors.black87,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold)),
-              Text(AppLocalizations.of(context).tapToRetry,
-                  style: const TextStyle(color: Colors.black54, fontSize: 11)),
-            ]),
-          ),
-        ]),
-      );
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(AppLocalizations.of(context).failedOrdersCount(total), style: texts.titleMedium),
+            Text(AppLocalizations.of(context).tapToRetry, style: texts.labelSmall),
+          ]),
+        ),
+      ]),
+    );
+  }
 }
 
 class _HisCancelledCard extends StatelessWidget {
@@ -1068,7 +979,8 @@ class _HisCancelledCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
     final items = (data['items'] as List?)?.cast<Map>() ?? [];
     final ts = data['createdAt'] as Timestamp?;
     final totalAmount = _hNum(data['totalAmount']);
@@ -1078,113 +990,68 @@ class _HisCancelledCard extends StatelessWidget {
         ? t.failedPaymentLabel
         : t.cancelled;
 
-    return GestureDetector(
-      onTap: onTap,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.red.shade100),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 3))
-          ],
+          borderRadius: AppRadius.cardRadius,
+          border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
         ),
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.restaurant,
-                  color: Colors.red, size: 18),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(_hStr(data['restaurantName']),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14),
-                        overflow: TextOverflow.ellipsis),
-                    Text(ts != null ? _hDate(ts) : '—',
-                        style: TextStyle(
-                            fontSize: 11, color: Colors.grey.shade500)),
-                  ]),
-            ),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.cancel_outlined,
-                    color: Colors.red, size: 12),
-                const SizedBox(width: 4),
-                Text(failedLabel,
-                    style: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold)),
-              ]),
-            ),
-          ]),
-          if (items.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              items
-                      .take(3)
-                      .map((i) => '${i['quantity']}× ${i['name']}')
-                      .join(' • ') +
-                  (items.length > 3
-                      ? ' +${items.length - 3}'
-                      : ''),
-              style:
-                  TextStyle(fontSize: 12, color: Colors.grey.shade500),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('$totalAmount FCFA',
-                  style: const TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14)),
+        child: PremiumCard(
+          onTap: onTap,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.replay,
-                          color: Colors.white, size: 13),
-                      const SizedBox(width: 4),
-                      Text(AppLocalizations.of(context).retryLabel,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold)),
-                    ]),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.restaurant_rounded, color: AppColors.error, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(_hStr(data['restaurantName']), style: texts.titleSmall, overflow: TextOverflow.ellipsis),
+                  Text(ts != null ? _hDate(ts) : '—', style: texts.labelSmall),
+                ]),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.1), borderRadius: AppRadius.chipRadius),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.cancel_outlined, color: AppColors.error, size: 12),
+                  const SizedBox(width: 4),
+                  Text(failedLabel, style: const TextStyle(color: AppColors.error, fontSize: 11, fontWeight: FontWeight.bold)),
+                ]),
+              ),
+            ]),
+            if (items.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                items.take(3).map((i) => '${i['quantity']}× ${i['name']}').join(' • ') +
+                    (items.length > 3 ? ' +${items.length - 3}' : ''),
+                style: texts.bodySmall,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
-          ),
-        ]),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('$totalAmount FCFA', style: const TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 14)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(color: AppColors.accent, borderRadius: AppRadius.chipRadius),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.replay_rounded, color: Colors.white, size: 13),
+                    const SizedBox(width: 4),
+                    Text(AppLocalizations.of(context).retryLabel,
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ]),
+                ),
+              ],
+            ),
+          ]),
+        ),
       ),
     );
   }
@@ -1202,6 +1069,8 @@ class _HisCancelledDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
     final items = (data['items'] as List?)?.cast<Map>() ?? [];
     final total = _hNum(data['totalAmount']);
     final delivFee = _hNum(data['deliveryFee']);
@@ -1216,9 +1085,9 @@ class _HisCancelledDetailSheet extends StatelessWidget {
 
     return Container(
       height: double.infinity,
-      decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      decoration: BoxDecoration(
+          color: brightness == Brightness.dark ? AppColors.surfaceDark : AppColors.surfaceLight,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.card))),
       padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom + 20),
       child: Column(children: [
@@ -1227,7 +1096,7 @@ class _HisCancelledDetailSheet extends StatelessWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: brightness == Brightness.dark ? AppColors.dividerDark : AppColors.dividerLight,
                 borderRadius: BorderRadius.circular(2))),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
@@ -1236,27 +1105,15 @@ class _HisCancelledDetailSheet extends StatelessWidget {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_hStr(data['restaurantName']),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 17)),
-                    Text('Commande #$shortId',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey.shade500)),
+                    Text(_hStr(data['restaurantName']), style: texts.headlineSmall),
+                    Text('Commande #$shortId', style: texts.labelSmall),
                   ]),
             ),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: Colors.red.withValues(alpha: 0.3))),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.1), borderRadius: AppRadius.chipRadius),
               child: Text(AppLocalizations.of(context).failedOrderBadge,
-                  style: const TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12)),
+                  style: const TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 12)),
             ),
           ]),
         ),
@@ -1264,20 +1121,11 @@ class _HisCancelledDetailSheet extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
           child: Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.red.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.red.shade200),
-            ),
+            decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
             child: Row(children: [
-              Icon(Icons.info_outline,
-                  color: Colors.red.shade600, size: 15),
+              const Icon(Icons.info_outline_rounded, color: AppColors.error, size: 15),
               const SizedBox(width: 8),
-              Expanded(
-                child: Text(failReason,
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.red.shade700)),
-              ),
+              Expanded(child: Text(failReason, style: const TextStyle(fontSize: 12, color: AppColors.error))),
             ]),
           ),
         ),
@@ -1288,9 +1136,7 @@ class _HisCancelledDetailSheet extends StatelessWidget {
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-              Text(AppLocalizations.of(context).itemsLabel,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 13)),
+              Text(AppLocalizations.of(context).itemsLabel, style: texts.titleSmall),
               const SizedBox(height: 8),
               ...items.map((item) => Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1298,28 +1144,16 @@ class _HisCancelledDetailSheet extends StatelessWidget {
                       Container(
                         width: 26,
                         height: 26,
-                        decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(8)),
+                        decoration:
+                            BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
                         child: Center(
                           child: Text('${item['quantity']}',
-                              style: const TextStyle(
-                                  color: Colors.orange,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12)),
+                              style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 12)),
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Expanded(
-                          child: Text(
-                              _hStr(item['name']),
-                              style: const TextStyle(fontSize: 13),
-                              overflow: TextOverflow.ellipsis)),
-                      Text(
-                          '${_hNum(item['price']) * _hNum(item['quantity'])} FCFA',
-                          style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500)),
+                      Expanded(child: Text(_hStr(item['name']), style: texts.bodyMedium, overflow: TextOverflow.ellipsis)),
+                      Text('${_hNum(item['price']) * _hNum(item['quantity'])} FCFA', style: AppTextStyles.price(brightness, size: 13, weight: FontWeight.w500)),
                     ]),
                   )),
               const SizedBox(height: 14),
@@ -1336,19 +1170,11 @@ class _HisCancelledDetailSheet extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
-          child: ElevatedButton.icon(
+          child: PremiumButton(
+            label: AppLocalizations.of(context).retryPayment,
+            icon: Icons.replay_rounded,
+            height: 56,
             onPressed: onRetry,
-            icon: const Icon(Icons.replay, size: 20),
-            label: Text(AppLocalizations.of(context).retryPayment,
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 56),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(28)),
-            ),
           ),
         ),
       ]),
@@ -1360,49 +1186,43 @@ class _HisCancelledDetailSheet extends StatelessWidget {
 class _HisEmptyDelivered extends StatelessWidget {
   const _HisEmptyDelivered();
   @override
-  Widget build(BuildContext context) => Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            padding: const EdgeInsets.all(28),
-            decoration: BoxDecoration(
-                color: Colors.orange.shade50, shape: BoxShape.circle),
-            child: Icon(Icons.receipt_long_outlined,
-                size: 56, color: Colors.orange.shade300),
-          ),
-          const SizedBox(height: 20),
-          Text(AppLocalizations.of(context).noDeliveredOrders,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text(AppLocalizations.of(context).deliveredOrdersHint,
-              style: TextStyle(
-                  color: Colors.grey.shade500, fontSize: 13)),
-        ]),
-      );
+  Widget build(BuildContext context) {
+    final texts = AppTextStyles.textTheme(Theme.of(context).brightness);
+    return Center(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), shape: BoxShape.circle),
+          child: const Icon(Icons.receipt_long_outlined, size: 52, color: AppColors.accent),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        Text(AppLocalizations.of(context).noDeliveredOrders, style: texts.headlineSmall),
+        const SizedBox(height: AppSpacing.xs),
+        Text(AppLocalizations.of(context).deliveredOrdersHint, style: texts.bodyMedium),
+      ]),
+    ).animate().fadeIn(duration: 350.ms).slideY(begin: 0.05, end: 0);
+  }
 }
 
 class _HisEmptyCancelled extends StatelessWidget {
   const _HisEmptyCancelled();
   @override
-  Widget build(BuildContext context) => Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            padding: const EdgeInsets.all(28),
-            decoration: BoxDecoration(
-                color: Colors.green.shade50, shape: BoxShape.circle),
-            child: Icon(Icons.check_circle_outline,
-                size: 56, color: Colors.green.shade400),
-          ),
-          const SizedBox(height: 20),
-          const Text('Aucune commande échouée',
-              style:
-                  TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text('Super ! Tous vos paiements ont réussi.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  color: Colors.grey.shade500, fontSize: 13)),
-        ]),
-      );
+  Widget build(BuildContext context) {
+    final texts = AppTextStyles.textTheme(Theme.of(context).brightness);
+    return Center(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.08), shape: BoxShape.circle),
+          child: const Icon(Icons.check_circle_outline_rounded, size: 52, color: AppColors.success),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        Text('Aucune commande échouée', style: texts.headlineSmall),
+        const SizedBox(height: AppSpacing.xs),
+        Text('Super ! Tous vos paiements ont réussi.', textAlign: TextAlign.center, style: texts.bodyMedium),
+      ]),
+    ).animate().fadeIn(duration: 350.ms).slideY(begin: 0.05, end: 0);
+  }
 }
 
 class _HisReceiptActions extends StatefulWidget {
@@ -1493,32 +1313,31 @@ class _HisActionBtn extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            loading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.black54))
-                : Icon(icon, color: Colors.black54, size: 20),
-            const SizedBox(height: 4),
-            Text(label,
-                style: const TextStyle(
-                    color: Colors.black54,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600)),
-          ]),
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: brightness == Brightness.dark ? AppColors.backgroundDark : AppColors.backgroundLight,
+          borderRadius: BorderRadius.circular(12),
         ),
-      );
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          loading
+              ? Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(color: texts.bodySmall?.color, shape: BoxShape.circle),
+                ).animate(onPlay: (c) => c.repeat(reverse: true)).fadeIn(duration: 500.ms).scaleXY(end: 0.7)
+              : Icon(icon, color: texts.bodySmall?.color, size: 20),
+          const SizedBox(height: 4),
+          Text(label, style: texts.labelMedium),
+        ]),
+      ),
+    );
+  }
 }
 
 class _HisReviewButton extends StatefulWidget {
@@ -1550,14 +1369,14 @@ class _HisReviewButtonState extends State<_HisReviewButton> {
   }
 
   void _openSheet() {
+    final brightness = Theme.of(context).brightness;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.white,
+      backgroundColor: brightness == Brightness.dark ? AppColors.surfaceDark : AppColors.surfaceLight,
       shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(24))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.card))),
       builder: (_) => _HisReviewSheet(
         restaurantId: widget.restaurantId,
         restaurantName: widget.restaurantName,
@@ -1570,34 +1389,30 @@ class _HisReviewButtonState extends State<_HisReviewButton> {
   @override
   Widget build(BuildContext context) {
     if (_alreadyReviewed == null) return const SizedBox.shrink();
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
     if (_alreadyReviewed == true) {
       return Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.grey.shade50,
+          color: brightness == Brightness.dark ? AppColors.backgroundDark : AppColors.backgroundLight,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade200),
         ),
-        child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(Icons.check_circle_outline,
-              color: Colors.black54, size: 16),
-          SizedBox(width: 8),
-          Text('Avis déjà soumis — merci !',
-              style: TextStyle(color: Colors.black54, fontSize: 13)),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(Icons.check_circle_outline_rounded, color: texts.bodySmall?.color, size: 16),
+          const SizedBox(width: 8),
+          Text('Avis déjà soumis — merci !', style: texts.bodyMedium),
         ]),
       );
     }
     return OutlinedButton.icon(
       onPressed: _openSheet,
-      icon: const Icon(Icons.star_border_outlined, size: 18),
+      icon: const Icon(Icons.star_border_rounded, size: 18),
       label: const Text('Laisser un avis'),
       style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.orange,
-        side: BorderSide(color: Colors.orange.shade300),
+        foregroundColor: AppColors.accent,
+        side: const BorderSide(color: AppColors.accent),
         minimumSize: const Size(double.infinity, 46),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -1653,10 +1468,9 @@ class _HisReviewSheetState extends State<_HisReviewSheet> {
       widget.onSubmitted();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: const Text('Merci pour votre avis !'),
-        backgroundColor: Colors.green.shade600,
+        backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.button)),
       ));
     } catch (_) {
       if (mounted) setState(() => _saving = false);
@@ -1664,111 +1478,82 @@ class _HisReviewSheetState extends State<_HisReviewSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          left: 20,
-          right: 20,
-          top: 16,
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final texts = AppTextStyles.textTheme(brightness);
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        left: 20,
+        right: 20,
+        top: 16,
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Center(
+          child: Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+                color: brightness == Brightness.dark ? AppColors.dividerDark : AppColors.dividerLight,
+                borderRadius: BorderRadius.circular(2)),
+          ),
         ),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text('Évaluer ${widget.restaurantName}',
-              style: const TextStyle(
-                  fontSize: 17, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(5, (i) {
-              final star = i + 1;
-              return GestureDetector(
-                onTap: () => setState(() => _rating = star.toDouble()),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Icon(
-                    star <= _rating ? Icons.star : Icons.star_border,
-                    color: Colors.orange,
-                    size: 36,
-                  ),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _rating >= 5
-                ? 'Excellent !'
-                : _rating >= 4
-                    ? 'Très bien'
-                    : _rating >= 3
-                        ? 'Bien'
-                        : _rating >= 2
-                            ? 'Moyen'
-                            : 'Décevant',
-            style: TextStyle(
-                color: Colors.orange.shade700,
-                fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _ctrl,
-            maxLines: 3,
-            decoration: InputDecoration(
-              hintText: 'Partagez votre expérience (optionnel)',
-              hintStyle: TextStyle(
-                  color: Colors.grey.shade400, fontSize: 13),
-              filled: true,
-              fillColor: Colors.grey.shade50,
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      BorderSide(color: Colors.grey.shade200)),
-              enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      BorderSide(color: Colors.grey.shade200)),
-              focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                      color: Colors.orange, width: 1.5)),
-            ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: _saving ? null : _submit,
-              icon: _saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2))
-                  : const Icon(Icons.send_outlined),
-              label: Text(
-                  _saving ? 'Envoi en cours...' : 'Publier mon avis'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+        const SizedBox(height: 12),
+        Text('Évaluer ${widget.restaurantName}', style: texts.headlineSmall, textAlign: TextAlign.center),
+        const SizedBox(height: 20),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(5, (i) {
+            final star = i + 1;
+            final filled = star <= _rating;
+            return GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() => _rating = star.toDouble());
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Icon(filled ? Icons.star_rounded : Icons.star_border_rounded,
+                        color: const Color(0xFFFFB020), size: 36)
+                    .animate(target: filled ? 1 : 0)
+                    .scaleXY(end: 1.15, duration: 120.ms)
+                    .then()
+                    .scaleXY(end: 1, duration: 100.ms),
               ),
-            ),
-          ),
-        ]),
-      );
+            );
+          }),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _rating >= 5
+              ? 'Excellent !'
+              : _rating >= 4
+                  ? 'Très bien'
+                  : _rating >= 3
+                      ? 'Bien'
+                      : _rating >= 2
+                          ? 'Moyen'
+                          : 'Décevant',
+          style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          controller: _ctrl,
+          maxLines: 3,
+          style: texts.bodyMedium,
+          decoration: const InputDecoration(hintText: 'Partagez votre expérience (optionnel)'),
+        ),
+        const SizedBox(height: 20),
+        PremiumButton(
+          label: 'Publier mon avis',
+          icon: Icons.send_rounded,
+          loading: _saving,
+          height: 52,
+          onPressed: _saving ? null : _submit,
+        ),
+      ]),
+    );
+  }
 }
 
 class _DetailRow extends StatelessWidget {
@@ -1780,8 +1565,7 @@ class _DetailRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 3),
         child:
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(label,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+          Text(label, style: AppTextStyles.textTheme(Theme.of(context).brightness).labelSmall),
           Flexible(
             child: Text(value,
                 textAlign: TextAlign.right,
@@ -1799,26 +1583,22 @@ class _DetailRow extends StatelessWidget {
 class _EmptyCart extends StatelessWidget {
   const _EmptyCart({super.key});
   @override
-  Widget build(BuildContext context) => Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            padding: const EdgeInsets.all(30),
-            decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.orange.shade900.withValues(alpha: 0.3)
-                    : Colors.orange.shade50,
-                shape: BoxShape.circle),
-            child: const Icon(Icons.shopping_cart_outlined,
-                size: 70, color: Colors.orange),
-          ),
-          const SizedBox(height: 20),
-          const Text('Votre panier est vide',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          const Text('Ajoutez des plats depuis les restaurants',
-              style: TextStyle(color: Colors.grey)),
-        ]),
-      );
+  Widget build(BuildContext context) {
+    final texts = AppTextStyles.textTheme(Theme.of(context).brightness);
+    return Center(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), shape: BoxShape.circle),
+          child: const Icon(Icons.shopping_cart_outlined, size: 64, color: AppColors.accent),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        Text('Votre panier est vide', style: texts.headlineSmall),
+        const SizedBox(height: AppSpacing.xs),
+        Text('Ajoutez des plats depuis les restaurants', style: texts.bodyMedium),
+      ]),
+    ).animate().fadeIn(duration: 350.ms).slideY(begin: 0.05, end: 0);
+  }
 }
 
 class _CartItemCard extends StatelessWidget {
@@ -1835,93 +1615,73 @@ class _CartItemCard extends StatelessWidget {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-            color: Colors.red.shade400,
-            borderRadius: BorderRadius.circular(16)),
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+        decoration: BoxDecoration(color: AppColors.error, borderRadius: AppRadius.cardRadius),
         child: const Column(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.delete_outline, color: Colors.white, size: 28),
           SizedBox(height: 4),
-          Text('Supprimer',
-              style: TextStyle(color: Colors.white, fontSize: 12)),
+          Text('Supprimer', style: TextStyle(color: Colors.white, fontSize: 12)),
         ]),
       ),
       onDismissed: (_) => cart.removeItem(index),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? const Color(0xFF1E1E1E)
-              : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 3))
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: item.img.startsWith('http')
-                  ? Image.network(item.img,
-                      width: 70,
-                      height: 70,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _platFallback())
-                  : Image.asset(item.img,
-                      width: 70,
-                      height: 70,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _platFallback()),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text(item.name,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 15),
-                      overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 2),
-                  Text(item.restaurantName,
-                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                      overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 6),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(item.price,
-                        style: const TextStyle(
-                            color: Colors.orange,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14)),
-                  ),
-                ])),
-            Column(children: [
-              _QtyBtn(Icons.add, () => cart.increaseQuantity(index)),
-              const SizedBox(height: 4),
-              Text('${item.quantity}',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 4),
-              _QtyBtn(Icons.remove, () => cart.decreaseQuantity(index)),
+      child: Builder(builder: (context) {
+        final brightness = Theme.of(context).brightness;
+        final texts = AppTextStyles.textTheme(brightness);
+        return Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: AppRadius.cardRadius,
+            boxShadow: AppShadows.light(brightness),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(children: [
+              ClipRRect(
+                borderRadius: AppRadius.imageRadius,
+                child: item.img.startsWith('http')
+                    ? CachedNetworkImage(
+                        imageUrl: item.img,
+                        width: 70,
+                        height: 70,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => SkeletonLoader.image(width: 70, height: 70, radius: BorderRadius.zero),
+                        errorWidget: (_, __, ___) => _platFallback(),
+                      )
+                    : Image.asset(item.img, width: 70, height: 70, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _platFallback()),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(item.name, style: texts.titleMedium, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 2),
+                Text(item.restaurantName, style: texts.bodySmall, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 6),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(item.price, style: AppTextStyles.priceAccent(size: 14)),
+                ),
+              ])),
+              Column(children: [
+                _QtyBtn(Icons.add_rounded, () => cart.increaseQuantity(index)),
+                const SizedBox(height: 4),
+                Text('${item.quantity}', style: texts.titleLarge),
+                const SizedBox(height: 4),
+                _QtyBtn(Icons.remove_rounded, () => cart.decreaseQuantity(index)),
+              ]),
             ]),
-          ]),
-        ),
-      ),
+          ),
+        );
+      }),
     );
   }
 
   Widget _platFallback() => Container(
       width: 70,
       height: 70,
-      color: Colors.orange.shade50,
-      child: const Icon(Icons.fastfood, color: Colors.orange));
+      color: AppColors.accent.withValues(alpha: 0.08),
+      child: const Icon(Icons.fastfood_rounded, color: AppColors.accent));
 }
 
 class _QtyBtn extends StatelessWidget {
@@ -1935,9 +1695,9 @@ class _QtyBtn extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-              border: Border.all(color: Colors.orange.shade200),
+              border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
               borderRadius: BorderRadius.circular(20)),
-          child: Icon(icon, size: 16, color: Colors.orange),
+          child: Icon(icon, size: 16, color: AppColors.accent),
         ),
       );
 }
@@ -2032,7 +1792,7 @@ void showOrderSheet(BuildContext context, CartProvider cart) {
                                       fontSize: 14),
                                   overflow: TextOverflow.ellipsis,
                                   maxLines: 1),
-                              Text('${item.price} é ${item.quantity}',
+                              Text('${item.price} × ${item.quantity}',
                                   style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey.shade500),
@@ -2056,22 +1816,15 @@ void showOrderSheet(BuildContext context, CartProvider cart) {
                 const Divider(height: 16),
                 _SheetRow(
                     'Total estimé', '${cart.totalAmount + serviceFee} FCFA',
-                    bold: true, color: Colors.orange),
+                    bold: true, color: AppColors.accent),
                 const SizedBox(height: 20),
-                ElevatedButton(
+                PremiumButton(
+                  label: 'Confirmer et choisir l\'adresse',
+                  height: 52,
                   onPressed: () {
                     Navigator.pop(context);
                     Navigator.of(context).popUntil((r) => r.isFirst);
                   },
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 52),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(26))),
-                  child: const Text('Confirmer et choisir l\'adresse',
-                      style:
-                          TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -2131,20 +1884,15 @@ class _SummaryState extends State<_Summary> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
+    final texts = AppTextStyles.textTheme(brightness);
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-          ? const Color(0xFF1E1E1E)
-          : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 15,
-              offset: const Offset(0, -5))
-        ],
+        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
+        boxShadow: AppShadows.medium(brightness),
       ),
       child: SingleChildScrollView(
         physics: const ClampingScrollPhysics(),
@@ -2154,7 +1902,7 @@ class _SummaryState extends State<_Summary> {
             height: 4,
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
-                color: isDark ? Colors.grey[700] : Colors.grey[300],
+                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
                 borderRadius: BorderRadius.circular(2))),
 
         _Row('Sous-total plats', '${widget.cart.totalPrice} FCFA'),
@@ -2164,47 +1912,26 @@ class _SummaryState extends State<_Summary> {
         const Divider(height: 20),
         _Row('Total (hors livraison)', '$_total FCFA', bold: true),
         const SizedBox(height: 4),
-        Text('+ frais de livraison calculés à l\'étape suivante',
-            style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-        const SizedBox(height: 16),
+        Text('+ frais de livraison calculés à l\'étape suivante', style: texts.labelSmall),
+        const SizedBox(height: AppSpacing.md),
         OutlinedButton.icon(
           onPressed: () => showOrderSheet(context, widget.cart),
-          style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.orange,
-              side: const BorderSide(color: Colors.orange),
-              minimumSize: const Size(double.infinity, 46),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(27))),
+          style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 46)),
           icon: const Icon(Icons.receipt_long_outlined, size: 18),
-          label: const Text('Récapitulatif de commande',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          label: const Text('Récapitulatif de commande'),
         ),
         const SizedBox(height: 10),
-        ElevatedButton(
+        PremiumButton(
+          label: 'Choisir l\'adresse de livraison',
+          icon: Icons.location_on_rounded,
+          height: 54,
           onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                  builder: (_) => AdressePage(
-                        totalAmount: _total,
-                      ))),
-          style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 54),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(27))),
-          child:
-              const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.location_on_outlined),
-            SizedBox(width: 8),
-            Text('Choisir l\'adresse de livraison',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-          ]),
+              MaterialPageRoute(builder: (_) => AdressePage(totalAmount: _total))),
         ),
         TextButton(
           onPressed: () => _confirmClear(context),
-          child: const Text('Vider le panier',
-              style: TextStyle(color: Colors.red)),
+          child: const Text('Vider le panier', style: TextStyle(color: AppColors.error)),
         ),
       ]),
       ),

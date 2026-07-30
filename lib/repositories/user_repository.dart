@@ -1,5 +1,5 @@
 // lib/repositories/user_repository.dart
-// ? Repository pattern é fait le lien Firestore ? Firebase Auth ? Supabase Storage
+// ✓ Repository pattern — fait le lien Firestore ↔ Firebase Auth ↔ Supabase Storage
 // Responsabilité unique : opérations CRUD sur l'utilisateur
 
 import 'package:flutter/foundation.dart';

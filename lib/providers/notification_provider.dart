@@ -1,5 +1,5 @@
 // lib/providers/notification_provider.dart
-// ? 100% Firebase é stream Firestore temps réel, aucun polling
+// ✓ 100% Firebase — stream Firestore temps réel, aucun polling
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -37,7 +37,7 @@ class NotificationProvider extends ChangeNotifier {
     });
   }
 
-  // Stream push instantané é badge mis à jour dés qu'une notif isRead:false change
+  // Stream push instantané — badge mis à jour dès qu'une notif isRead:false change
   void _startStream(String uid) {
     _stream?.cancel();
     _stream = FirebaseFirestore.instance
@@ -55,7 +55,7 @@ class NotificationProvider extends ChangeNotifier {
     }, onError: (_) {});
   }
 
-  // Marquer tout lu é batch Firestore (le stream remet _unreadCount é 0 auto)
+  // Marquer tout lu — batch Firestore (le stream remet _unreadCount à 0 auto)
   Future<void> markAllAsRead() async {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;

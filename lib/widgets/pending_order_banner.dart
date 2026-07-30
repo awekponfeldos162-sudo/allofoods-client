@@ -1,5 +1,5 @@
 ﻿// lib/widgets/pending_order_banner.dart
-// ? Firebase : pas de changement nécessaire é Provider local uniquement
+// ✓ Firebase : pas de changement nécessaire — Provider local uniquement
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';

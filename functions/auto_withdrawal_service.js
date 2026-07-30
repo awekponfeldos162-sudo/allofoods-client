@@ -15,6 +15,12 @@ const https                        = require("https");
 const db  = getFirestore();
 const fcm = getMessaging();
 
+// Champs financiers (momo_number, wallet_balance...) vivent dans une
+// sous-collection privée — voir index.js pour le détail de la migration.
+function _walletRef(restaurantId) {
+  return db.collection("restaurants").doc(restaurantId).collection("private").doc("wallet");
+}
+
 // ── Constantes financières ─────────────────────────────
 const MIN_WITHDRAWAL  = 10000;   // FCFA seuil retrait manuel
 const AUTO_WITHDRAWAL = 50000;   // FCFA seuil retrait automatique
@@ -37,7 +43,8 @@ const FEDAPAY_BASE    = FEDAPAY_SANDBOX
 async function declencherAutoRetrait(restaurantId, balance) {
   const restSnap = await db.collection("restaurants").doc(restaurantId).get();
   if (!restSnap.exists) return;
-  const rest = restSnap.data();
+  const walletSnap = await _walletRef(restaurantId).get();
+  const rest = { ...restSnap.data(), ...walletSnap.data() };
 
   // Vérification numéro MoMo
   if (!rest.momo_number) {
@@ -52,8 +59,8 @@ async function declencherAutoRetrait(restaurantId, balance) {
   }
 
   // Double-vérification du solde actuel (évite les doublons si appelé plusieurs fois)
-  const freshSnap = await db.collection("restaurants").doc(restaurantId).get();
-  const freshBalance = freshSnap.data()?.wallet_balance ?? 0;
+  const freshWalletSnap = await _walletRef(restaurantId).get();
+  const freshBalance = freshWalletSnap.data()?.wallet_balance ?? 0;
   if (freshBalance < AUTO_WITHDRAWAL) {
     console.log(`[AutoRetrait] Solde insuffisant (${freshBalance}) — abandon`);
     return;
@@ -86,12 +93,12 @@ async function declencherAutoRetrait(restaurantId, balance) {
     // ── 3. Mise à jour Firestore atomique ───────────────
     const batch = db.batch();
 
-    batch.update(db.collection("restaurants").doc(restaurantId), {
+    batch.set(_walletRef(restaurantId), {
       wallet_balance:    0,
       wallet_updated_at: FieldValue.serverTimestamp(),
       total_withdrawn:   FieldValue.increment(freshBalance),
       last_auto_payout:  FieldValue.serverTimestamp(),
-    });
+    }, { merge: true });
 
     const txRef = db.collection("wallet_transactions").doc();
     batch.set(txRef, {
@@ -171,8 +178,9 @@ async function handleManualWithdrawal(request) {
   if (!restSnap.exists) {
     throw new HttpsError("not-found", "Restaurant introuvable");
   }
+  const walletSnap = await _walletRef(restaurantId).get();
 
-  const rest    = restSnap.data();
+  const rest    = { ...restSnap.data(), ...walletSnap.data() };
   const balance = rest.wallet_balance ?? 0;
 
   // Vérifications métier
@@ -228,12 +236,12 @@ async function handleManualWithdrawal(request) {
     // ── 3. Mise à jour Firestore atomique ───────────────
     const batch = db.batch();
 
-    batch.update(db.collection("restaurants").doc(restaurantId), {
+    batch.set(_walletRef(restaurantId), {
       wallet_balance:    0,
       wallet_updated_at: FieldValue.serverTimestamp(),
       total_withdrawn:   FieldValue.increment(balance),
       last_withdrawal:   FieldValue.serverTimestamp(),
-    });
+    }, { merge: true });
 
     const txRef = db.collection("wallet_transactions").doc();
     batch.set(txRef, {

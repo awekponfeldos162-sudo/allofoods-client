@@ -1,5 +1,5 @@
 // lib/widgets/ad_carousel.dart
-// Carousel de publicités home_top é pleine largeur + ombre portée
+// Carousel de publicités home_top — pleine largeur + ombre portée
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

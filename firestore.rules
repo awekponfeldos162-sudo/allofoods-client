@@ -2,93 +2,286 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // HELPERS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isDriver() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'driver';
+    }
+
+    function isRestaurantOwner(restaurantId) {
+      return isSignedIn()
+        && restaurantId != null
+        && exists(/databases/$(database)/documents/restaurants/$(restaurantId))
+        && get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.ownerUid == request.auth.uid;
+    }
+
+    // Champs financiers jamais écrits par le client — serveur (Admin SDK) uniquement
+    function touchesFinancialFields(fields) {
+      return fields.hasAny([
+        'paymentStatus', 'restoAmount', 'commission', 'fedaPayTransactionId',
+        'wallet_balance', 'total_earned', 'total_withdrawn', 'deliveryId'
+      ]);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // USERS
+    // ══════════════════════════════════════════════════════════════════════════
+
     match /users/{uid} {
-      allow read:  if request.auth != null;
-      allow create: if request.auth != null && request.auth.uid == uid;
-      allow update: if request.auth != null && request.auth.uid == uid
-          && request.resource.data.role == 'admin'
-          && request.resource.data.appOrigin == 'admin';
-      allow update: if request.auth != null && request.auth.uid == uid
-          && !request.resource.data.diff(resource.data)
-              .affectedKeys().hasAny(['role', 'appOrigin']);
-      allow update: if _isAdmin();
-      allow delete: if _isAdmin();
+      allow read: if isOwner(uid) || isAdmin() || isDriver();
+
+      allow create: if isOwner(uid)
+        && request.resource.data.get('role', 'client') != 'admin'
+        || isAdmin();
+
+      allow update: if isOwner(uid)
+        && !request.resource.data.diff(resource.data)
+            .affectedKeys().hasAny(['role', 'appOrigin', 'uid'])
+        || isAdmin();
+
+      allow delete: if isAdmin();
+
       match /notifications/{id} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
+        allow read, write: if isOwner(uid);
       }
+
       match /delivery_history/{id} {
-        allow read: if request.auth != null && request.auth.uid == uid;
-        allow write: if request.auth != null;
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if false; // Cloud Functions (Admin SDK) uniquement
       }
+
       match /monthly_earnings/{id} {
-        allow read: if request.auth != null && request.auth.uid == uid;
-        allow write: if request.auth != null;
-      }
-      match /savedAddresses/{addrId} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
-      match /recentAddresses/{addrId} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if false; // Cloud Functions (Admin SDK) uniquement
       }
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ORDERS
+    // ══════════════════════════════════════════════════════════════════════════
 
     match /orders/{orderId} {
-      allow create: if request.auth != null;
-      allow read: if request.auth != null && (
+      allow read: if isSignedIn() && (
         resource.data.clientUid  == request.auth.uid ||
         resource.data.deliveryId == request.auth.uid ||
-        _isDriver() ||
-        _isRestaurantOwner(resource.data.restaurantId) ||
-        _isAdmin()
+        isRestaurantOwner(resource.data.restaurantId) ||
+        isAdmin() ||
+        // Livreurs : lecture des commandes disponibles (prêtes, non encore assignées)
+        (isDriver() && resource.data.status == 'ready_for_pickup')
       );
-      allow update: if request.auth != null && (
-        resource.data.clientUid  == request.auth.uid ||
-        resource.data.deliveryId == request.auth.uid ||
-        _isDriver() ||
-        _isRestaurantOwner(resource.data.restaurantId) ||
-        _isAdmin()
-      );
+
+      allow create: if isSignedIn()
+        && request.resource.data.clientUid == request.auth.uid
+        && request.resource.data.paymentStatus in ['PENDING', 'pending']
+        && request.resource.data.status in ['pending', 'awaiting_payment']
+        && !request.resource.data.keys().hasAny([
+            'fedaPayTransactionId', 'wallet_balance',
+            'total_earned', 'total_withdrawn'
+           ])
+        // Impossible de commander chez un restaurant fermé, même en
+        // contournant l'app (vérification serveur, pas juste côté client).
+        && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantId))
+            .data.isActive == true;
+
+      // Client : annulation tant qu'aucun livreur n'est encore en route
+      // (avant acceptation/livraison — au-delà, passe par le support)
+      allow update: if isSignedIn()
+        && resource.data.clientUid == request.auth.uid
+        && resource.data.status in ['pending', 'awaiting_payment', 'paid', 'preparing', 'ready_for_pickup']
+        && request.resource.data.status == 'cancelled'
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'cancellationReason', 'cancelledAt', 'updatedAt']);
+
+      // Client : partage de sa position en temps réel avec le livreur
+      allow update: if isSignedIn()
+        && resource.data.clientUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['customerLiveLat', 'customerLiveLng']);
+
+      // Client : masquer une commande terminée de son historique (soft-delete local)
+      allow update: if isSignedIn()
+        && resource.data.clientUid == request.auth.uid
+        && resource.data.status in ['delivered', 'cancelled']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clientHidden']);
+
+      // Client : renseigner le numéro Mobile Money utilisé pour payer, avant
+      // la création de la transaction FedaPay (initFedaPayPayment le lit
+      // depuis ce champ, jamais depuis les paramètres client).
+      allow update: if isSignedIn()
+        && resource.data.clientUid == request.auth.uid
+        && resource.data.status == 'awaiting_payment'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customerPhone']);
+
+      // Client : confirmation de paiement FedaPay (awaiting_payment → paid)
+      allow update: if isSignedIn()
+        && resource.data.clientUid == request.auth.uid
+        && resource.data.status == 'awaiting_payment'
+        && resource.data.paymentStatus in ['PENDING', 'pending']
+        && request.resource.data.status == 'paid'
+        && request.resource.data.paymentStatus == 'PAID'
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'paymentStatus', 'fedaPayTransactionId',
+                      'paymentConfirmedAt', 'paidAt', 'updatedAt']);
+
+      // Client : échec de paiement (awaiting_payment → cancelled)
+      allow update: if isSignedIn()
+        && resource.data.clientUid == request.auth.uid
+        && resource.data.status == 'awaiting_payment'
+        && request.resource.data.status == 'cancelled'
+        && request.resource.data.paymentStatus == 'PAYMENT_FAILED'
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'paymentStatus', 'failedAt', 'updatedAt']);
+
+      // Livreur : accepter une commande ready_for_pickup (non encore assignée)
+      allow update: if isSignedIn()
+        && isDriver()
+        && resource.data.status == 'ready_for_pickup'
+        && resource.data.get('deliveryId', '') == ''
+        && request.resource.data.deliveryId == request.auth.uid
+        && request.resource.data.status == 'delivering'
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['deliveryId', 'driverName', 'driverPhone', 'driverWhatsapp',
+                      'driverVehicle', 'status', 'acceptedAt', 'updatedAt']);
+
+      // Livreur : refuser une commande (ajoute son uid dans rejectedBy)
+      allow update: if isSignedIn()
+        && isDriver()
+        && resource.data.status == 'ready_for_pickup'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rejectedBy']);
+
+      // Livreur : mise à jour pendant la livraison (position, statut, métriques terrain)
+      allow update: if isSignedIn()
+        && resource.data.deliveryId == request.auth.uid
+        && isDriver()
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'paymentStatus', 'restoAmount', 'commission', 'fedaPayTransactionId',
+            'wallet_balance', 'total_earned', 'total_withdrawn',
+            'clientUid', 'restaurantId', 'totalAmount', 'items'
+           ])
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'driverLocation', 'driverLat', 'driverLng', 'updatedAt',
+                      'departedAt', 'departureLat', 'departureLng',
+                      'deliveredAt', 'arrivalLat', 'arrivalLng',
+                      'deliveryFee', 'realDistanceKm']);
+
+      // Restaurant owner : statut préparation + annulation
+      allow update: if isRestaurantOwner(resource.data.restaurantId)
+        && !touchesFinancialFields(request.resource.data.diff(resource.data).affectedKeys())
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'updatedAt', 'estimatedTime',
+                      'acceptedAt', 'preparingAt', 'ready_for_pickupAt',
+                      'cancelledAt', 'cancellationReason']);
+
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+
       match /messages/{msgId} {
-        allow read, create: if request.auth != null;
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/orders/$(orderId)).data.clientUid == request.auth.uid ||
+          get(/databases/$(database)/documents/orders/$(orderId)).data.deliveryId == request.auth.uid ||
+          isRestaurantOwner(get(/databases/$(database)/documents/orders/$(orderId)).data.restaurantId) ||
+          isAdmin()
+        );
+        allow create: if isSignedIn();
       }
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // RESTAURANTS
+    // ══════════════════════════════════════════════════════════════════════════
+
     match /restaurants/{restId} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && (
-        resource.data.ownerUid == request.auth.uid ||
-        _isAdmin() ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating'])
-      );
-      allow delete: if _isAdmin();
+      // Les champs financiers sensibles (momo_number, wallet_balance...)
+      // vivent dans la sous-collection private/wallet ci-dessous — ce
+      // document principal ne contient plus que des infos publiques/opérationnelles,
+      // lisibles par tout utilisateur connecté.
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && !request.resource.data.keys().hasAny([
+            'wallet_balance', 'total_earned', 'total_withdrawn',
+            'momo_number', 'momo_network', 'auto_payout'
+           ])
+        && request.resource.data.get('is_approved', false) == false;
+
+      allow update: if isRestaurantOwner(restId)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['wallet_balance', 'total_earned', 'total_withdrawn',
+                     'momo_number', 'momo_network', 'auto_payout',
+                     'is_approved', 'ownerUid'])
+        || isAdmin();
+
+      // Client : rating uniquement
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating']);
+
+      allow delete: if isAdmin();
+
+      // Sous-collection privée : momo_number, wallet_balance, total_earned,
+      // total_withdrawn, auto_payout — jamais lisible par un autre restaurant
+      // ni par un client.
+      match /private/{docId} {
+        allow read: if isRestaurantOwner(restId) || isAdmin();
+
+        // Le propriétaire configure son numéro MoMo/réseau/préférence
+        // auto-payout à la création (inscription), mais ne peut jamais y
+        // définir un solde — celui-ci n'existe qu'après un premier crédit
+        // serveur (Cloud Function).
+        allow create: if isRestaurantOwner(restId)
+          && !request.resource.data.keys().hasAny(
+              ['wallet_balance', 'total_earned', 'total_withdrawn'])
+          || isAdmin();
+
+        // Idem à la mise à jour — jamais toucher au solde, réservé aux
+        // Cloud Functions (Admin SDK, qui bypass ces règles).
+        allow update: if isRestaurantOwner(restId)
+          && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['wallet_balance', 'total_earned', 'total_withdrawn'])
+          || isAdmin();
+
+        allow delete: if isAdmin();
+      }
 
       match /reviews/{reviewId} {
         allow read: if true;
-        allow create: if request.auth != null
+        allow create: if isSignedIn()
             && request.resource.data.clientUid == request.auth.uid;
-        allow update, delete: if request.auth != null
-            && (resource.data.clientUid == request.auth.uid || _isAdmin());
+        allow update, delete: if isSignedIn()
+            && (resource.data.clientUid == request.auth.uid || isAdmin());
       }
 
-      // Promos restaurant — un client ne peut utiliser le même code qu'une seule fois
       match /promos/{promoId} {
-        allow read: if request.auth != null;
+        allow read: if isSignedIn();
 
-        allow create: if request.auth != null
-            && (_isAdmin() || _isRestaurantOwner(restId))
+        allow create: if isSignedIn()
+            && (isAdmin() || isRestaurantOwner(restId))
             && request.resource.data.usedCount == 0;
 
-        allow delete: if request.auth != null
-            && (_isAdmin() || _isRestaurantOwner(restId));
+        allow delete: if isAdmin() || isRestaurantOwner(restId);
+        allow update: if isAdmin() || isRestaurantOwner(restId);
 
-        allow update: if request.auth != null
-            && (_isAdmin() || _isRestaurantOwner(restId));
-
-        // Client : incrémenter usedCount de +1 et s'ajouter à usedBy (usage unique)
-        allow update: if request.auth != null
-            && request.resource.data.diff(resource.data)
-                   .affectedKeys().hasOnly(['usedCount', 'usedBy'])
+        // Client : usage unique (usedCount + 1, s'ajouter à usedBy)
+        allow update: if isSignedIn()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount', 'usedBy'])
             && request.resource.data.usedCount == resource.data.usedCount + 1
             && !(request.auth.uid in resource.data.usedBy)
             && request.resource.data.usedBy.hasAll(resource.data.usedBy)
@@ -97,78 +290,151 @@ service cloud.firestore {
     }
 
     match /{path=**}/reviews/{reviewId} {
-      allow read, write: if _isAdmin();
+      allow read, write: if isAdmin();
     }
 
-    match /ratings/{ratingId} {
-      allow read:  if request.auth != null;
-      allow write: if request.auth != null
-          && request.resource.data.clientUid == request.auth.uid;
+    // ══════════════════════════════════════════════════════════════════════════
+    // DRIVERS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    match /drivers/{driverId} {
+      allow read: if isOwner(driverId) || isAdmin() || isDriver();
+      allow write: if (isOwner(driverId)
+        && !touchesFinancialFields(request.resource.data.diff(resource.data).affectedKeys()))
+        || isAdmin();
     }
 
-    match /categories/{id}    { allow read: if true; allow write: if _isAdmin(); }
-    match /cuisine_types/{id} { allow read: if true; allow write: if _isAdmin(); }
-    match /advertisements/{id}{ allow read: if true; allow write: if _isAdmin(); }
+    // ══════════════════════════════════════════════════════════════════════════
+    // CODES PROMO GLOBAUX
+    // ══════════════════════════════════════════════════════════════════════════
 
-    match /promos/{promoId} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && (
-        _isAdmin() || _isRestaurantOwner(resource.data.restaurantId)
-      );
-    }
-
-    // Codes promo globaux admin — un client ne peut utiliser le même code qu'une seule fois
     match /promo_codes/{docId} {
-      allow read: if request.auth != null;
-      allow create, delete: if _isAdmin();
-      allow update: if _isAdmin();
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin();
 
-      // Client : incrémenter usedCount de +1 et s'ajouter à usedBy (usage unique)
-      allow update: if request.auth != null
-          && request.resource.data.diff(resource.data)
-                 .affectedKeys().hasOnly(['usedCount', 'usedBy'])
+      // Client : usage unique
+      allow update: if isSignedIn()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount', 'usedBy'])
           && request.resource.data.usedCount == resource.data.usedCount + 1
           && !(request.auth.uid in resource.data.usedBy)
           && request.resource.data.usedBy.hasAll(resource.data.usedBy)
           && request.resource.data.usedBy.size() == resource.data.usedBy.size() + 1;
     }
 
-    match /drivers/{driverId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
-          && (request.auth.uid == driverId || _isAdmin());
+    // ══════════════════════════════════════════════════════════════════════════
+    // COLLECTIONS FINANCIÈRES — ÉCRITURE SERVEUR UNIQUEMENT
+    // Firebase Admin SDK bypass ces règles → Cloud Functions écrivent librement.
+    // ══════════════════════════════════════════════════════════════════════════
+
+    match /wallet_transactions/{id} {
+      allow read: if isSignedIn() && (
+        resource.data.restaurant_id != null && isRestaurantOwner(resource.data.restaurant_id)
+        || isOwner(resource.data.driver_id)
+        || isAdmin()
+      );
+      allow write: if false; // Cloud Functions (Admin SDK) uniquement
+    }
+
+    match /payout_history/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /payment_logs/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /payout_logs/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     match /wallets/{walletId} {
-      allow read: if request.auth != null && request.auth.uid == walletId;
-      allow write: if _isAdmin();
+      allow read: if isOwner(walletId) || isAdmin();
+      allow write: if false;
     }
 
-    match /admin/{docId}           { allow read, write: if _isAdmin(); }
-    match /payout_logs/{id}        { allow read: if _isAdmin(); allow write: if request.auth != null; }
-    match /wallet_transactions/{id}{ allow read, write: if request.auth != null; }
-    match /alerts/{alertId}        { allow create: if request.auth != null; allow read, update: if request.auth != null; }
-    match /support_tickets/{id}    { allow create: if request.auth != null; allow read: if request.auth != null && (resource.data.uid == request.auth.uid || _isAdmin()); allow update: if _isAdmin(); }
-    match /payment_logs/{id}       { allow read: if _isAdmin(); allow write: if request.auth != null; }
-    match /config/{docId}          { allow read: if true; allow write: if _isAdmin(); }
-    match /reports/{id}            { allow read: if _isAdmin(); allow write: if request.auth != null; }
-    match /audit_logs/{id}         { allow read: if _isAdmin(); allow write: if request.auth != null; }
+    // ══════════════════════════════════════════════════════════════════════════
+    // ADMIN & VERROUS SYSTÈME — SERVEUR UNIQUEMENT
+    // ══════════════════════════════════════════════════════════════════════════
 
-    function _isAdmin() {
-      return request.auth != null
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role.lower() == 'admin';
+    match /admin/{docId} {
+      allow read, write: if isAdmin();
     }
-    function _isDriver() {
-      return request.auth != null
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'driver';
+
+    match /payout_locks/{id} {
+      allow read, write: if false;
     }
-    function _isRestaurantOwner(restaurantId) {
-      return restaurantId != null
-        && exists(/databases/$(database)/documents/restaurants/$(restaurantId))
-        && get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.ownerUid == request.auth.uid;
+
+    match /auto_payout_queue/{id} {
+      allow read, write: if false;
+    }
+
+    match /withdrawal_requests/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    match /idempotency_keys/{id} {
+      allow read, write: if false; // Cloud Functions uniquement
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // CONTENU PUBLIC
+    // ══════════════════════════════════════════════════════════════════════════
+
+    match /categories/{id}     { allow read: if true; allow write: if isAdmin(); }
+    match /cuisine_types/{id}  { allow read: if true; allow write: if isAdmin(); }
+    match /advertisements/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /config/{docId}      { allow read: if true; allow write: if isAdmin(); }
+
+    match /ratings/{ratingId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+          && request.resource.data.clientUid == request.auth.uid;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // SUPPORT & LOGS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    match /alerts/{alertId} {
+      allow create: if isSignedIn();
+      allow read, update: if isSignedIn()
+          && (resource.data.uid == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /support_tickets/{id} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn()
+          && (resource.data.uid == request.auth.uid || isAdmin());
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /reports/{id} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /audit_logs/{id} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if false; // Immuables
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // NOTIFICATIONS PUSH — historique des campagnes admin
+    // Écriture via Admin SDK (Cloud Function sendPromoNotification)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    match /push_notifications/{id} {
+      allow read: if isAdmin();
+      allow write: if false; // Cloud Functions (Admin SDK) uniquement
     }
   }
 }
