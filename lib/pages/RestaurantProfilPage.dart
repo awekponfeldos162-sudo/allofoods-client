@@ -622,7 +622,8 @@ class _ReviewsTabState extends State<_ReviewsTab> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Merci ! Vous avez donné la note de $score/20'),
+          content: Text(
+              'Merci ! Vous avez donné $stars étoile${stars > 1 ? 's' : ''} à ce restaurant'),
           backgroundColor: AppColors.accent,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.button)),

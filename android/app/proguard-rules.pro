@@ -25,3 +25,10 @@
 -keepclassmembernames class kotlinx.** {
     volatile <fields>;
 }
+
+# local_auth — le R8/ProGuard du build release cassait silencieusement
+# l'authentification biométrique sans ces règles (plugin + AndroidX Biometric,
+# tous deux basés sur des callbacks/réflexion que le minifieur peut supprimer).
+-keep class io.flutter.plugins.localauth.** { *; }
+-keep class androidx.biometric.** { *; }
+-dontwarn androidx.biometric.**

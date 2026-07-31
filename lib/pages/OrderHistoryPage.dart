@@ -400,6 +400,8 @@ class _OrderCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(data['restaurantName'] as String? ?? 'Restaurant',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 14)),
                     Text(_formatDate(ts),
@@ -487,6 +489,8 @@ class _OrderDetailSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(data['restaurantName'] as String? ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 17)),
                     Text('Commande #${orderId.substring(0, 8).toUpperCase()}',
@@ -803,6 +807,8 @@ class _CancelledOrderDetailSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(data['restaurantName'] as String? ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 17)),
                     Text('Commande #${orderId.substring(0, 8).toUpperCase()}',

@@ -22,12 +22,22 @@ class AppColors {
   static const Color info = Color(0xFF3D9CF2);
 
   // ── Light — 60% fond / 30% structure ─────────────────────────
-  static const Color backgroundLight = Color(0xFFFAFAFA);
+  // Fond crème premium (au lieu d'un gris neutre) — cohérent avec les
+  // maquettes 2026 : chaleureux, met en valeur les cartes blanches.
+  static const Color backgroundLight = Color(0xFFFBF5EC);
   static const Color surfaceLight = Color(0xFFFFFFFF);
   static const Color textPrimaryLight = Color(0xFF1A1A1A);
   static const Color textSecondaryLight = Color(0xFF6E6E73);
-  static const Color dividerLight = Color(0xFFECECEC);
+  static const Color dividerLight = Color(0xFFEFE6D8);
   static const Color disabledLight = Color(0xFFD1D1D6);
+
+  /// Fond des barres de recherche / champs sur fond crème — légèrement
+  /// plus sombre que backgroundLight pour rester visible sans bordure.
+  static const Color fieldFillLight = Color(0xFFF3EEE4);
+  static const Color fieldFillDark = Color(0xFF232323);
+
+  /// Cercle d'icône de catégorie (accueil) — pêche doux sur fond crème.
+  static const Color categoryIconBg = Color(0xFFFDEBDA);
 
   // ── Dark — 60% fond / 30% structure ──────────────────────────
   static const Color backgroundDark = Color(0xFF0F0F0F);

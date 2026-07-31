@@ -100,6 +100,8 @@ class _ChatPageState extends State<ChatPage> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(
                 widget.driverName.isNotEmpty ? widget.driverName : t.driverLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                     fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
               ),

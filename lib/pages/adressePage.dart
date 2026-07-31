@@ -381,10 +381,11 @@ class _AdressePageState extends State<AdressePage> {
   }
 
   void _showDeliveryDetailsSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => Padding(
@@ -404,16 +405,21 @@ class _AdressePageState extends State<AdressePage> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(2)),
               ),
             ),
-            const Text('Ajouter un contact à cette adresse',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+            Text('Ajouter un contact à cette adresse',
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87)),
             const SizedBox(height: 4),
             Text(
               'Renseigner les contacts pour permettre au livreur de vous joindre facilement',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
             ),
             const SizedBox(height: 16),
             _Input(_nameCtrl, 'Nom du contact (optionnel)', Icons.person_outlined),
@@ -424,13 +430,17 @@ class _AdressePageState extends State<AdressePage> {
               controller: _noteCtrl,
               maxLines: 2,
               textCapitalization: TextCapitalization.sentences,
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
               decoration: InputDecoration(
                 hintText: 'Description / Repères (optionnel)',
-                hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade500),
-                prefixIcon:
-                    const Icon(Icons.info_outline, size: 18, color: Colors.black54),
+                hintStyle: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? Colors.grey.shade500 : Colors.grey.shade500),
+                prefixIcon: Icon(Icons.info_outline,
+                    size: 18,
+                    color: isDark ? Colors.grey.shade400 : Colors.black54),
                 filled: true,
-                fillColor: Colors.grey.shade100,
+                fillColor: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: BorderSide.none),
@@ -506,6 +516,7 @@ class _AdressePageState extends State<AdressePage> {
   }
 
   void _showSaveSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final labelCtrl = TextEditingController(
       text: widget.prefillType == 'home'
           ? 'Domicile'
@@ -518,7 +529,7 @@ class _AdressePageState extends State<AdressePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => StatefulBuilder(
@@ -539,12 +550,15 @@ class _AdressePageState extends State<AdressePage> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
                       borderRadius: BorderRadius.circular(2)),
                 ),
               ),
-              const Text('Enregistrer l\'adresse',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+              Text('Enregistrer l\'adresse',
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87)),
               const SizedBox(height: 16),
               Wrap(
                 spacing: 8,
@@ -555,9 +569,15 @@ class _AdressePageState extends State<AdressePage> {
                           ? 'Domicile'
                           : t == 'work'
                               ? 'Travail'
-                              : 'Personnalisé'),
+                              : 'Personnalisé',
+                          style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black87)),
                       selected: selectedType == t,
-                      selectedColor: Colors.orange.shade100,
+                      backgroundColor:
+                          isDark ? Colors.grey.shade800 : null,
+                      selectedColor: isDark
+                          ? Colors.orange.shade900
+                          : Colors.orange.shade100,
                       onSelected: (v) {
                         if (v) {
                           setModal(() => selectedType = t);
@@ -673,9 +693,16 @@ class _AdressePageState extends State<AdressePage> {
   Widget build(BuildContext context) {
     final canConfirm = _address.isNotEmpty && !_geocoding;
     final bottomPad = MediaQuery.of(context).padding.bottom;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final panelBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: panelBg,
+      // La carte n'a pas besoin de rétrécir quand le clavier s'ouvre pour la
+      // recherche — sans ça, le panneau bas (45% fixe) se retrouve avec moins
+      // d'espace que son contenu n'en réclame et déborde au-dessus du clavier.
+      resizeToAvoidBottomInset: false,
       body: Column(
         children: [
           // ── CARTE (55% de l'écran) ──────────────────────────────────────
@@ -797,9 +824,9 @@ class _AdressePageState extends State<AdressePage> {
           Expanded(
             flex: 45,
             child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
+              decoration: BoxDecoration(
+                color: panelBg,
+                boxShadow: const [
                   BoxShadow(
                       color: Colors.black12,
                       blurRadius: 12,
@@ -825,10 +852,12 @@ class _AdressePageState extends State<AdressePage> {
                               color: Colors.orange, size: 20),
                         ),
                         const SizedBox(width: 12),
-                        const Text(
+                        Text(
                           'Sélectionnez l\'adresse',
                           style: TextStyle(
-                              fontSize: 17, fontWeight: FontWeight.bold),
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: textColor),
                         ),
                       ],
                     ),
@@ -839,20 +868,22 @@ class _AdressePageState extends State<AdressePage> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
+                        color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
                             child: Icon(Icons.search,
-                                color: Colors.black45, size: 20),
+                                color: isDark ? Colors.grey.shade400 : Colors.black45,
+                                size: 20),
                           ),
                           Expanded(
                             child: TextField(
                               controller: _searchCtrl,
                               onChanged: _onSearchChanged,
+                              style: TextStyle(color: textColor),
                               decoration: const InputDecoration(
                                 hintText: 'Trouver une adresse',
                                 hintStyle: TextStyle(
@@ -900,7 +931,7 @@ class _AdressePageState extends State<AdressePage> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
+                          color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(
@@ -911,7 +942,7 @@ class _AdressePageState extends State<AdressePage> {
                             Expanded(
                               child: Text(
                                 _address,
-                                style: const TextStyle(fontSize: 13),
+                                style: TextStyle(fontSize: 13, color: textColor),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),

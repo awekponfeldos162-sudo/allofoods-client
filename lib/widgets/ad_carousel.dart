@@ -235,7 +235,7 @@ class _DefaultBanner extends StatelessWidget {
 
           // Contenu
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(22),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
@@ -247,30 +247,44 @@ class _DefaultBanner extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text(
-                    'allofoods',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text('🔥', style: TextStyle(fontSize: 11)),
+                    SizedBox(width: 4),
+                    Text(
+                      'OFFRE SPÉCIALE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                      ),
                     ),
-                  ),
+                  ]),
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Livraison rapide\né Cotonou',
+                  'Livraison rapide\nà Cotonou',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 22,
+                    fontSize: 21,
                     fontWeight: FontWeight.bold,
                     height: 1.2,
                   ),
                 ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Commandez vos plats préférés',
-                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Commander maintenant',
+                    style: TextStyle(
+                        color: Color(0xFFE64A19),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),

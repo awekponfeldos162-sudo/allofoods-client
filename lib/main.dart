@@ -28,6 +28,7 @@ import 'providers/active_order_notifier.dart';
 import 'pages/NotificationsPage.dart';
 import 'pages/SettingsScreen.dart';
 import 'pages/TrackingPage.dart';
+import 'services/biometric_service.dart';
 import 'pages/WaitingPage.dart';
 import 'pages/restaurant_detail_page.dart';
 import 'models/restaurant_model.dart';
@@ -301,7 +302,7 @@ class _AuthGateState extends State<AuthGate> {
                 context.read<ActiveOrderNotifier>().startWatching(user.uid);
                 FcmService.initialize();
               });
-              return const MainScaffold();
+              return const _BiometricLockGate(child: MainScaffold());
             },
           );
         }
@@ -313,6 +314,123 @@ class _AuthGateState extends State<AuthGate> {
         return const LoginPage();
       },
     );
+  }
+}
+
+// VERROU BIOMÉTRIQUE — si activé dans Paramètres, exige une authentification
+// biométrique au démarrage ET à chaque retour au premier plan (l'app aurait
+// pu être laissée ouverte puis reprise par quelqu'un d'autre).
+class _BiometricLockGate extends StatefulWidget {
+  final Widget child;
+  const _BiometricLockGate({required this.child});
+  @override
+  State<_BiometricLockGate> createState() => _BiometricLockGateState();
+}
+
+class _BiometricLockGateState extends State<_BiometricLockGate>
+    with WidgetsBindingObserver {
+  bool _checking = true;
+  bool _unlocked = false;
+  bool _biometricRequired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Attendre que l'Activity Android soit pleinement attachée avant
+    // d'afficher le prompt — l'appeler trop tôt (dès initState) échoue
+    // silencieusement sur certains appareils.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAndUnlock());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        _biometricRequired &&
+        !_checking) {
+      setState(() => _unlocked = false);
+      _promptUnlock();
+    }
+  }
+
+  Future<void> _checkAndUnlock() async {
+    final enabled = await BiometricService.isEnabled();
+    if (!mounted) return;
+    setState(() {
+      _biometricRequired = enabled;
+      _checking = false;
+    });
+    if (enabled) {
+      await _promptUnlock();
+    } else {
+      setState(() => _unlocked = true);
+    }
+  }
+
+  Future<void> _promptUnlock() async {
+    final ok = await BiometricService.authenticate(
+        reason: 'Authentifiez-vous pour ouvrir allofoods');
+    if (!mounted) return;
+    setState(() => _unlocked = ok);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_checking) return const _SplashScreen();
+    if (!_unlocked) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: Center(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.fingerprint, size: 72, color: Colors.orange),
+            const SizedBox(height: 20),
+            const Text('Application verrouillée',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('Authentifiez-vous pour continuer',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+            if (BiometricService.lastError != null) ...[
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(BiometricService.lastError!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.red, fontSize: 11)),
+              ),
+            ],
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _promptUnlock,
+              icon: const Icon(Icons.lock_open),
+              label: const Text('Déverrouiller'),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14))),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () async {
+                await BiometricService.setEnabled(false);
+                if (mounted) setState(() => _unlocked = true);
+              },
+              child: Text('Désactiver le verrou biométrique',
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+            ),
+          ]),
+        ),
+      );
+    }
+    return widget.child;
   }
 }
 
@@ -629,7 +747,9 @@ class _MainScaffoldState extends State<MainScaffold> {
     final t = AppLocalizations.of(context);
     final titles = ['allofoods', t.restaurants, t.cart, t.address, t.profile];
     return Scaffold(
-      appBar: allofoodsAppBar(title: titles[_index]),
+      // Onglet Accueil : en-tête intégrée à Homepage (salutation + cloche +
+      // avatar) — la barre allofoodsAppBar ferait doublon.
+      appBar: _index == 0 ? null : allofoodsAppBar(title: titles[_index]),
       body: PageView(
         controller: _pageCtrl,
         physics: const ClampingScrollPhysics(),

@@ -59,41 +59,59 @@ class AdBannerWidget extends StatelessWidget {
             fit: BoxFit.cover,
             errorWidget: (_, __, ___) => const SizedBox.shrink(),
           ),
-        // Overlay sombre si image présente pour lisibilité du texte
-        if (imageUrl.isNotEmpty)
-          Container(color: Colors.black.withValues(alpha: 0.3)),
+        // Overlay dégradé orange — garde une identité "carte de marque"
+        // lisible même par-dessus une photo, plutôt qu'un simple voile noir.
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                colorStart.withValues(alpha: imageUrl.isNotEmpty ? 0.88 : 1),
+                colorEnd.withValues(alpha: imageUrl.isNotEmpty ? 0.55 : 1),
+              ],
+            ),
+          ),
+        ),
         // Contenu texte
         Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               if (type != 'banner') ...[
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white.withValues(alpha: 0.24),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
-                    type == 'promo' ? 'OFFRE SPéCIALE' : 'allofoods',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Text('🔥', style: TextStyle(fontSize: 10)),
+                    const SizedBox(width: 4),
+                    Text(
+                      type == 'promo' ? 'OFFRE SPÉCIALE' : 'ALLOFOODS',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.4,
+                      ),
                     ),
-                  ),
+                  ]),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
               ],
               Text(
                 title,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 18,
+                  fontSize: 19,
                   fontWeight: FontWeight.bold,
+                  height: 1.15,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -107,6 +125,24 @@ class AdBannerWidget extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
+              const SizedBox(height: 10),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text('Commander',
+                      style: TextStyle(
+                          color: colorEnd,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_forward_rounded, color: colorEnd, size: 14),
+                ]),
+              ),
             ],
           ),
         ),

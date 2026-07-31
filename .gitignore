@@ -91,3 +91,13 @@ enpreinte.*
 test/
 test/
 functions/test/
+
+certificate/
+firestore.rules
+screenshots/
+
+macos/Flutter/GeneratedPluginRegistrant.swift
+        pubspec.lock/
+        pubspec.yaml/
+        windows/flutter/generated_plugin_registrant.cc/
+       windows/flutter/generated_plugins.cmake/

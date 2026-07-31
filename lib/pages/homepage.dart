@@ -17,6 +17,7 @@ import 'adressePage.dart';
 import 'restaurantpage.dart';
 import '../widgets/ad_carousel.dart';
 import '../models/cart_model.dart';
+import '../models/delivery_model.dart' show DeliveryProvider;
 import 'promo_page.dart';
 import '../l10n/app_localizations.dart';
 
@@ -121,14 +122,30 @@ class _HomepageState extends State<Homepage> {
         .toList();
 
     const breakfastCats = [
-      'petit-déjeuner', 'breakfast', 'viennois', 'matin', 'brunch', 'petit déjeuner'
+      'petit-déjeuner',
+      'breakfast',
+      'viennois',
+      'matin',
+      'brunch',
+      'petit déjeuner'
     ];
     const lunchCats = [
-      'midi', 'déjeuner', 'plat', 'africain', 'traditionnel', 'lunch', 'principal', 'riz', 'poulet'
+      'midi',
+      'déjeuner',
+      'plat',
+      'africain',
+      'traditionnel',
+      'lunch',
+      'principal',
+      'riz',
+      'poulet'
     ];
 
     final breakfast = entries
-        .where((e) { final c = e.plat.category.toLowerCase(); return breakfastCats.any((k) => c.contains(k)); })
+        .where((e) {
+          final c = e.plat.category.toLowerCase();
+          return breakfastCats.any((k) => c.contains(k));
+        })
         .take(10)
         .toList();
 
@@ -136,7 +153,10 @@ class _HomepageState extends State<Homepage> {
       ..sort((a, b) => b.restaurant.rating.compareTo(a.restaurant.rating));
 
     final lunch = entries
-        .where((e) { final c = e.plat.category.toLowerCase(); return lunchCats.any((k) => c.contains(k)); })
+        .where((e) {
+          final c = e.plat.category.toLowerCase();
+          return lunchCats.any((k) => c.contains(k));
+        })
         .take(10)
         .toList();
 
@@ -160,11 +180,12 @@ class _HomepageState extends State<Homepage> {
     );
   }
 
-  void _goToRestaurants() {
+  void _goToRestaurants([String? sectionTitle]) {
     HapticFeedback.selectionClick();
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const RestaurantPage()),
+      MaterialPageRoute(
+          builder: (_) => RestaurantPage(sectionTitle: sectionTitle)),
     );
   }
 
@@ -172,7 +193,9 @@ class _HomepageState extends State<Homepage> {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final bg = brightness == Brightness.dark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final bg = brightness == Brightness.dark
+        ? AppColors.backgroundDark
+        : AppColors.backgroundLight;
 
     if (_loading) {
       return Container(color: bg, child: const _HomeSkeleton());
@@ -183,81 +206,84 @@ class _HomepageState extends State<Homepage> {
 
     return Container(
       color: bg,
-      child: RefreshIndicator(
-        color: AppColors.accent,
-        onRefresh: _load,
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: 30),
-          children: [
-            const _LocationBar(),
-            const _SearchBar(),
-            _CategoryFilter(
-              selected: _selectedCategory,
-              onSelect: (cat) {
-                if (_selectedCategory == cat) return;
-                setState(() => _selectedCategory = cat);
-                _applyCategory();
-              },
-            ),
-
-            const AdCarousel(),
-
-            if (_promoRestaurants.isNotEmpty) ...[
-              _Header(t.offersAndPromos, onSeeAll: () {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => PromoPage(restaurants: _promoRestaurants),
-                    ));
-              }),
-              _PromoList(items: _promoRestaurants, onTap: _open),
-            ],
-
-            if (_breakfastPlats.isNotEmpty) ...[
-              _Header(t.breakfast, onSeeAll: _goToRestaurants),
-              _HPlatList(items: _breakfastPlats, onTap: (e) => _open(e.restaurant)),
-            ],
-
-            if (_allRestaurants.isNotEmpty) ...[
-              _Header(t.sectionFeatured, onSeeAll: _goToRestaurants),
-              _HRestaurantList(
-                items: _featured.isNotEmpty
-                    ? _featured
-                    : _allRestaurants.take(8).toList(),
-                onTap: _open,
+      child: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          color: AppColors.accent,
+          onRefresh: _load,
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 30),
+            children: [
+              const _LocationBar(),
+              const AdCarousel(),
+              const _SearchBar(),
+              _CategoryFilter(
+                selected: _selectedCategory,
+                onSelect: (cat) {
+                  if (_selectedCategory == cat) return;
+                  setState(() => _selectedCategory = cat);
+                  _applyCategory();
+                },
               ),
+              if (_promoRestaurants.isNotEmpty) ...[
+                _Header(t.offersAndPromos, onSeeAll: () {
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            PromoPage(restaurants: _promoRestaurants),
+                      ));
+                }),
+                _PromoList(items: _promoRestaurants, onTap: _open),
+              ],
+              if (_breakfastPlats.isNotEmpty) ...[
+                _Header(t.breakfast,
+                    onSeeAll: () => _goToRestaurants(t.breakfast)),
+                _HPlatList(
+                    items: _breakfastPlats, onTap: (e) => _open(e.restaurant)),
+              ],
+              if (_allRestaurants.isNotEmpty) ...[
+                _Header(t.sectionFeatured,
+                    onSeeAll: () => _goToRestaurants(t.sectionFeatured)),
+                _HRestaurantList(
+                  items: _featured.isNotEmpty
+                      ? _featured
+                      : _allRestaurants.take(8).toList(),
+                  onTap: _open,
+                ),
+              ],
+              if (_popularPlats.isNotEmpty) ...[
+                _Header(t.popularDishes,
+                    onSeeAll: () => _goToRestaurants(t.popularDishes)),
+                _HPlatList(
+                    items: _popularPlats, onTap: (e) => _open(e.restaurant)),
+              ],
+              if (_daily.isNotEmpty) ...[
+                _Header(t.sectionDaily,
+                    onSeeAll: () => _goToRestaurants(t.sectionDaily)),
+                _Carousel(items: _daily, onTap: _open),
+              ],
+              if (_lunchPlats.isNotEmpty) ...[
+                _Header(t.lunchDishes,
+                    onSeeAll: () => _goToRestaurants(t.lunchDishes)),
+                _HPlatList(
+                    items: _lunchPlats, onTap: (e) => _open(e.restaurant)),
+              ],
+              if (proches.isNotEmpty) ...[
+                _Header(t.restaurantsNearby,
+                    onSeeAll: () => _goToRestaurants(t.restaurantsNearby)),
+                _HRestaurantList(items: proches, onTap: _open),
+              ],
+              if (_explore.isNotEmpty) ...[
+                _Header(t.otherRestaurants,
+                    onSeeAll: () => _goToRestaurants(t.otherRestaurants)),
+                _Grid(items: _explore, onTap: _open),
+                _SeeMoreBtn(onTap: () => _goToRestaurants(t.otherRestaurants)),
+              ],
+              if (_allRestaurants.isEmpty) _EmptyRestaurants(t: t),
+              const SizedBox(height: 20),
             ],
-
-            if (_popularPlats.isNotEmpty) ...[
-              _Header(t.popularDishes, onSeeAll: _goToRestaurants),
-              _HPlatList(items: _popularPlats, onTap: (e) => _open(e.restaurant)),
-            ],
-
-            if (_daily.isNotEmpty) ...[
-              _Header(t.sectionDaily, onSeeAll: _goToRestaurants),
-              _Carousel(items: _daily, onTap: _open),
-            ],
-
-            if (_lunchPlats.isNotEmpty) ...[
-              _Header(t.lunchDishes, onSeeAll: _goToRestaurants),
-              _HPlatList(items: _lunchPlats, onTap: (e) => _open(e.restaurant)),
-            ],
-
-            if (proches.isNotEmpty) ...[
-              _Header(t.restaurantsNearby, onSeeAll: _goToRestaurants),
-              _HRestaurantList(items: proches, onTap: _open),
-            ],
-
-            if (_explore.isNotEmpty) ...[
-              _Header(t.otherRestaurants, onSeeAll: _goToRestaurants),
-              _Grid(items: _explore, onTap: _open),
-              _SeeMoreBtn(onTap: _goToRestaurants),
-            ],
-
-            if (_allRestaurants.isEmpty) _EmptyRestaurants(t: t),
-
-            const SizedBox(height: 20),
-          ],
+          ),
         ),
       ),
     );
@@ -282,12 +308,15 @@ class _EmptyRestaurants extends StatelessWidget {
               color: AppColors.accent.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.restaurant_rounded, size: 52, color: AppColors.accent),
+            child: const Icon(Icons.restaurant_rounded,
+                size: 52, color: AppColors.accent),
           ),
           const SizedBox(height: AppSpacing.md),
-          Text(t.noRestaurantsAvailable, style: texts.headlineSmall, textAlign: TextAlign.center),
+          Text(t.noRestaurantsAvailable,
+              style: texts.headlineSmall, textAlign: TextAlign.center),
           const SizedBox(height: AppSpacing.xs),
-          Text(t.comeBackSoon, style: texts.bodyMedium, textAlign: TextAlign.center),
+          Text(t.comeBackSoon,
+              style: texts.bodyMedium, textAlign: TextAlign.center),
         ]),
       ),
     ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05, end: 0);
@@ -316,7 +345,8 @@ class _HomeSkeleton extends StatelessWidget {
             itemCount: 3,
             itemBuilder: (_, __) => Padding(
               padding: const EdgeInsets.only(right: AppSpacing.sm),
-              child: SizedBox(width: 170, child: SkeletonLoader.card(height: 212)),
+              child:
+                  SizedBox(width: 170, child: SkeletonLoader.card(height: 212)),
             ),
           ),
         ),
@@ -330,72 +360,134 @@ class _HomeSkeleton extends StatelessWidget {
   }
 }
 
-// BARRE DE LOCALISATION + AVATAR
+// BARRE DE LOCALISATION + SALUTATION + NOTIFICATIONS + AVATAR
 class _LocationBar extends StatelessWidget {
   const _LocationBar();
 
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
     final texts = AppTextStyles.textTheme(brightness);
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    final cardColor = brightness == Brightness.dark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final cardColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final delivery = context.watch<DeliveryProvider>();
+    // Premier segment de l'adresse (ex: "Akpakpa" plutôt que l'adresse
+    // complète) — reste lisible dans la largeur limitée de la barre.
+    final addressLabel = delivery.hasAddress
+        ? delivery.clientAddress.split(',').first.trim()
+        : 'Choisir une adresse';
 
     return Container(
       color: cardColor,
-      padding: const EdgeInsets.fromLTRB(AppSpacing.md, 12, AppSpacing.md, 8),
-      child: Row(children: [
-        // Zone de livraison — tap → AdressePage
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const AdressePage()));
-            },
-            child: Row(children: [
-              const Icon(Icons.location_on_rounded, color: AppColors.accent, size: 20),
-              const SizedBox(width: 6),
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(AppLocalizations.of(context).deliveryTo, style: texts.labelSmall),
-                Row(children: [
-                  Text('Cotonou', style: texts.titleMedium),
-                  const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.accent),
-                ]),
-              ]),
-            ]),
-          ),
-        ),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, 14, AppSpacing.md, 10),
+      child: StreamBuilder<DocumentSnapshot>(
+        stream: uid != null
+            ? FirebaseFirestore.instance
+                .collection('users')
+                .doc(uid)
+                .snapshots()
+            : null,
+        builder: (_, snap) {
+          final data = snap.data?.data() as Map<String, dynamic>? ?? {};
+          final photoUrl = (data['photoUrl'] as String?)?.isNotEmpty == true
+              ? data['photoUrl'] as String
+              : (data['photoURL'] as String?)?.isNotEmpty == true
+                  ? data['photoURL'] as String
+                  : '';
+          final name =
+              data['displayName'] as String? ?? data['name'] as String? ?? '';
+          final firstName =
+              name.trim().isNotEmpty ? name.trim().split(' ').first : '';
+          final initials = name.isNotEmpty
+              ? name.trim().split(' ').map((w) => w[0]).take(2).join()
+              : '?';
 
-        // Avatar utilisateur (photo ou initiales)
-        if (uid != null)
-          StreamBuilder<DocumentSnapshot>(
-            stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
-            builder: (_, snap) {
-              final data = snap.data?.data() as Map<String, dynamic>? ?? {};
-              final photoUrl = (data['photoUrl'] as String?)?.isNotEmpty == true
-                  ? data['photoUrl'] as String
-                  : (data['photoURL'] as String?)?.isNotEmpty == true
-                      ? data['photoURL'] as String
-                      : '';
-              final name = data['displayName'] as String? ?? data['name'] as String? ?? '';
-              final initials =
-                  name.isNotEmpty ? name.trim().split(' ').map((w) => w[0]).take(2).join() : '?';
+          return Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            // Salutation + adresse (tap → AdressePage)
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const AdressePage()));
+                },
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Bonjour 👋', style: texts.labelSmall),
+                      const SizedBox(height: 2),
+                      Text(
+                        firstName.isNotEmpty
+                            ? name
+                            : AppLocalizations.of(context).welcome,
+                        style: texts.headlineSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Row(children: [
+                        const Icon(Icons.location_on_rounded,
+                            color: AppColors.accent, size: 14),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(addressLabel,
+                              style: texts.labelSmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        const Icon(Icons.keyboard_arrow_down_rounded,
+                            size: 14, color: AppColors.accent),
+                      ]),
+                    ]),
+              ),
+            ),
 
-              return GestureDetector(
+            const SizedBox(width: 10),
+
+            // Cloche de notifications
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                Navigator.pushNamed(context, '/notifications');
+              },
+              child: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.backgroundDark
+                      : AppColors.backgroundLight,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.notifications_none_rounded,
+                    color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                    size: 22),
+              ),
+            ),
+
+            const SizedBox(width: 10),
+
+            // Avatar utilisateur (photo ou initiales)
+            if (uid != null)
+              GestureDetector(
                 onTap: () => HapticFeedback.selectionClick(),
                 child: photoUrl.isNotEmpty
-                    ? CircleAvatar(radius: 20, backgroundImage: NetworkImage(photoUrl))
+                    ? CircleAvatar(
+                        radius: 21, backgroundImage: NetworkImage(photoUrl))
                     : CircleAvatar(
-                        radius: 20,
-                        backgroundColor: AppColors.accent,
+                        radius: 21,
+                        backgroundColor: AppColors.secondary,
                         child: Text(initials.toUpperCase(),
                             style: const TextStyle(
-                                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14)),
                       ),
-              );
-            },
-          ),
-      ]),
+              ),
+          ]);
+        },
+      ),
     );
   }
 }
@@ -416,17 +508,21 @@ class _SearchBar extends StatelessWidget {
       child: TapScale(
         pressedScale: 0.985,
         haptic: HapticFeedbackType.selection,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RestaurantPage())),
+        onTap: () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const RestaurantPage())),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           decoration: BoxDecoration(
-            color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+            color:
+                isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
             borderRadius: AppRadius.chipRadius,
           ),
           child: Row(children: [
             const Icon(Icons.search_rounded, color: AppColors.accent, size: 20),
             const SizedBox(width: 10),
-            Text(AppLocalizations.of(context).searchHint, style: texts.bodyMedium?.copyWith(color: texts.labelMedium?.color)),
+            Text(AppLocalizations.of(context).searchHint,
+                style: texts.bodyMedium
+                    ?.copyWith(color: texts.labelMedium?.color)),
           ]),
         ),
       ),
@@ -443,7 +539,8 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final texts = AppTextStyles.textTheme(Theme.of(context).brightness);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 8),
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md, AppSpacing.md, AppSpacing.md, 8),
       child: Row(
         children: [
           Expanded(child: Text(title, style: texts.headlineSmall)),
@@ -455,8 +552,10 @@ class _Header extends StatelessWidget {
               },
               child: Row(children: [
                 Text(AppLocalizations.of(context).seeAll,
-                    style: texts.labelMedium?.copyWith(color: AppColors.accent, fontWeight: FontWeight.w600)),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.accent, size: 18),
+                    style: texts.labelMedium?.copyWith(
+                        color: AppColors.accent, fontWeight: FontWeight.w600)),
+                const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.accent, size: 18),
               ]),
             ),
         ],
@@ -495,7 +594,8 @@ class _HRestaurantList extends StatelessWidget {
         height: 212,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, 4),
+          padding:
+              const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, 4),
           itemCount: items.length,
           itemBuilder: (_, i) {
             final r = items[i];
@@ -513,7 +613,10 @@ class _HRestaurantList extends StatelessWidget {
                   ),
                 ),
               ),
-            ).animate().fadeIn(duration: 300.ms, delay: (i * 60).ms).slideX(begin: 0.08, end: 0);
+            )
+                .animate()
+                .fadeIn(duration: 300.ms, delay: (i * 60).ms)
+                .slideX(begin: 0.08, end: 0);
           },
         ),
       );
@@ -530,12 +633,16 @@ class _HPlatList extends StatelessWidget {
         height: 205,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, 4),
+          padding:
+              const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, 4),
           itemCount: items.length,
           itemBuilder: (_, i) => Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: _HPlatCard(item: items[i], onTap: () => onTap(items[i])),
-          ).animate().fadeIn(duration: 300.ms, delay: (i * 60).ms).slideX(begin: 0.08, end: 0),
+          )
+              .animate()
+              .fadeIn(duration: 300.ms, delay: (i * 60).ms)
+              .slideX(begin: 0.08, end: 0),
         ),
       );
 }
@@ -559,24 +666,34 @@ class _HPlatCard extends StatelessWidget {
         padding: EdgeInsets.zero,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(AppRadius.card)),
             child: _Img(img: plat.img, width: 150, height: 95),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(plat.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: texts.titleSmall),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(plat.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: texts.titleSmall),
               const SizedBox(height: 2),
-              Text(item.restaurant.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: texts.bodySmall),
+              Text(item.restaurant.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: texts.bodySmall),
               const SizedBox(height: 6),
               Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                 Expanded(
-                  child: Text('${plat.priceInt} F', style: AppTextStyles.priceAccent(size: 13)),
+                  child: Text('${plat.priceInt} F',
+                      style: AppTextStyles.priceAccent(size: 13)),
                 ),
                 Consumer<CartProvider>(
                   builder: (_, cart, __) {
-                    final inCart = cart.items
-                        .any((i) => i.name == plat.name && i.restaurantId == item.restaurant.id);
+                    final inCart = cart.items.any((i) =>
+                        i.name == plat.name &&
+                        i.restaurantId == item.restaurant.id);
                     return GestureDetector(
                       onTap: () {
                         HapticFeedback.lightImpact();
@@ -595,8 +712,12 @@ class _HPlatCard extends StatelessWidget {
                           color: inCart ? AppColors.success : AppColors.accent,
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(inCart ? Icons.check_rounded : Icons.add_rounded,
-                                color: Colors.white, size: 15)
+                        child: Icon(
+                                inCart
+                                    ? Icons.check_rounded
+                                    : Icons.add_rounded,
+                                color: Colors.white,
+                                size: 15)
                             .animate(target: inCart ? 1 : 0)
                             .scaleXY(end: 1.15, duration: 150.ms)
                             .then()
@@ -635,7 +756,9 @@ class _CarouselState extends State<_Carousel> {
       _timer = Timer.periodic(const Duration(seconds: 4), (_) {
         if (!mounted) return;
         final next = (_page + 1) % widget.items.length;
-        _ctrl.animateToPage(next, duration: const Duration(milliseconds: 200), curve: Curves.easeInOut);
+        _ctrl.animateToPage(next,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut);
       });
     }
   }
@@ -673,13 +796,19 @@ class _CarouselState extends State<_Carousel> {
                     child: ClipRRect(
                       borderRadius: AppRadius.cardRadius,
                       child: Stack(children: [
-                        _Img(img: r.coverImg, width: double.infinity, height: 200),
+                        _Img(
+                            img: r.coverImg,
+                            width: double.infinity,
+                            height: 200),
                         DecoratedBox(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.bottomCenter,
                               end: Alignment.topCenter,
-                              colors: [AppColors.imageOverlay.withValues(alpha: 0.75), Colors.transparent],
+                              colors: [
+                                AppColors.imageOverlay.withValues(alpha: 0.75),
+                                Colors.transparent
+                              ],
                             ),
                           ),
                         ),
@@ -694,38 +823,62 @@ class _CarouselState extends State<_Carousel> {
                             child: Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                  color: AppColors.imageOverlay.withValues(alpha: 0.35), shape: BoxShape.circle),
-                              child: Icon(isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                                  color: isFav ? AppColors.error : Colors.white, size: 18),
+                                  color: AppColors.imageOverlay
+                                      .withValues(alpha: 0.35),
+                                  shape: BoxShape.circle),
+                              child: Icon(
+                                  isFav
+                                      ? Icons.favorite_rounded
+                                      : Icons.favorite_border_rounded,
+                                  color: isFav ? AppColors.error : Colors.white,
+                                  size: 18),
                             ),
                           ),
                         ),
                         Positioned(
                           top: 10,
                           left: 10,
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            _OpenBadge(isOpen: r.isActive),
-                            if (r.hasActivePromo) ...[const SizedBox(height: 4), const _PromoBadge()],
-                          ]),
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _OpenBadge(isOpen: r.isActive),
+                                if (r.hasActivePromo) ...[
+                                  const SizedBox(height: 4),
+                                  const _PromoBadge()
+                                ],
+                              ]),
                         ),
                         Positioned(
                           bottom: 14,
                           left: 14,
                           right: 14,
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(r.name,
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
-                            Text(r.style, style: const TextStyle(color: Color(0xFFFFCC99), fontSize: 12)),
-                            const SizedBox(height: 4),
-                            Row(children: [
-                              const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFFB020)),
-                              Text(' ${r.rating.toStringAsFixed(1)}',
-                                  style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                              const SizedBox(width: 10),
-                              const Icon(Icons.timer_rounded, size: 12, color: Colors.white70),
-                              Text(' ${r.deliveryTime} min', style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                            ]),
-                          ]),
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(r.name,
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 17)),
+                                Text(r.style,
+                                    style: const TextStyle(
+                                        color: Color(0xFFFFCC99),
+                                        fontSize: 12)),
+                                const SizedBox(height: 4),
+                                Row(children: [
+                                  const Icon(Icons.star_rounded,
+                                      size: 12, color: Color(0xFFFFB020)),
+                                  Text(' ${r.rating.toStringAsFixed(1)}',
+                                      style: const TextStyle(
+                                          color: Colors.white70, fontSize: 11)),
+                                  const SizedBox(width: 10),
+                                  const Icon(Icons.timer_rounded,
+                                      size: 12, color: Colors.white70),
+                                  Text(' ${r.deliveryTime} min',
+                                      style: const TextStyle(
+                                          color: Colors.white70, fontSize: 11)),
+                                ]),
+                              ]),
                         ),
                       ]),
                     ),
@@ -747,7 +900,9 @@ class _CarouselState extends State<_Carousel> {
             width: _page == i ? 18 : 7,
             height: 7,
             decoration: BoxDecoration(
-              color: _page == i ? AppColors.accent : AppColors.accent.withValues(alpha: 0.25),
+              color: _page == i
+                  ? AppColors.accent
+                  : AppColors.accent.withValues(alpha: 0.25),
               borderRadius: BorderRadius.circular(4),
             ),
           ),
@@ -787,57 +942,88 @@ class _Grid extends StatelessWidget {
               return (PremiumCard(
                 onTap: () => onTap(r),
                 padding: EdgeInsets.zero,
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
-                      child: Stack(fit: StackFit.expand, children: [
-                        _Img(img: r.coverImg, width: double.infinity, height: 105),
-                        Positioned(
-                          top: 6,
-                          left: 6,
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            _OpenBadge(isOpen: r.isActive),
-                            if (r.hasActivePromo) ...[const SizedBox(height: 3), const _PromoBadge()],
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(AppRadius.card)),
+                          child: Stack(fit: StackFit.expand, children: [
+                            _Img(
+                                img: r.coverImg,
+                                width: double.infinity,
+                                height: 105),
+                            Positioned(
+                              top: 6,
+                              left: 6,
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _OpenBadge(isOpen: r.isActive),
+                                    if (r.hasActivePromo) ...[
+                                      const SizedBox(height: 3),
+                                      const _PromoBadge()
+                                    ],
+                                  ]),
+                            ),
+                            Positioned(
+                              top: 6,
+                              right: 6,
+                              child: GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  favs.toggleRestaurant(r.id);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(5),
+                                  decoration: BoxDecoration(
+                                      color: AppColors.imageOverlay
+                                          .withValues(alpha: 0.35),
+                                      shape: BoxShape.circle),
+                                  child: Icon(
+                                      isFav
+                                          ? Icons.favorite_rounded
+                                          : Icons.favorite_border_rounded,
+                                      color: isFav
+                                          ? AppColors.error
+                                          : Colors.white,
+                                      size: 14),
+                                ),
+                              ),
+                            ),
                           ]),
                         ),
-                        Positioned(
-                          top: 6,
-                          right: 6,
-                          child: GestureDetector(
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              favs.toggleRestaurant(r.id);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(5),
-                              decoration: BoxDecoration(
-                                  color: AppColors.imageOverlay.withValues(alpha: 0.35), shape: BoxShape.circle),
-                              child: Icon(isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                                  color: isFav ? AppColors.error : Colors.white, size: 14),
-                            ),
-                          ),
-                        ),
-                      ]),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(r.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: texts.titleSmall),
-                      const SizedBox(height: 2),
-                      Text(r.style, maxLines: 1, overflow: TextOverflow.ellipsis, style: texts.bodySmall),
-                      const SizedBox(height: 6),
-                      Row(children: [
-                        const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFFB020)),
-                        Text(' ${r.rating.toStringAsFixed(1)}', style: texts.labelSmall),
-                        const Spacer(),
-                        Icon(Icons.timer_rounded, size: 12, color: texts.bodySmall?.color),
-                        Text(' ${r.deliveryTime}m', style: texts.bodySmall),
-                      ]),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(r.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: texts.titleSmall),
+                              const SizedBox(height: 2),
+                              Text(r.style,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: texts.bodySmall),
+                              const SizedBox(height: 6),
+                              Row(children: [
+                                const Icon(Icons.star_rounded,
+                                    size: 12, color: Color(0xFFFFB020)),
+                                Text(' ${r.rating.toStringAsFixed(1)}',
+                                    style: texts.labelSmall),
+                                const Spacer(),
+                                Icon(Icons.timer_rounded,
+                                    size: 12, color: texts.bodySmall?.color),
+                                Text(' ${r.deliveryTime}m',
+                                    style: texts.bodySmall),
+                              ]),
+                            ]),
+                      ),
                     ]),
-                  ),
-                ]),
               ))
                   .animate()
                   .fadeIn(duration: 300.ms, delay: (i * 40).ms)
@@ -857,11 +1043,16 @@ class _PromoBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-        decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(6)),
+        decoration: BoxDecoration(
+            color: AppColors.error, borderRadius: BorderRadius.circular(6)),
         child: const Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.local_offer_rounded, size: 9, color: Colors.white),
           SizedBox(width: 3),
-          Text('Promo', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+          Text('Promo',
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white)),
         ]),
       );
 }
@@ -875,7 +1066,8 @@ class _OpenBadge extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
         decoration: BoxDecoration(
-          color: (isOpen ? AppColors.success : AppColors.error).withValues(alpha: 0.15),
+          color: (isOpen ? AppColors.success : AppColors.error)
+              .withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
@@ -889,62 +1081,90 @@ class _OpenBadge extends StatelessWidget {
       );
 }
 
-// FILTRES CATÉGORIES
+// FILTRES CATÉGORIES — icônes circulaires + libellé (façon "stories")
 class _CategoryFilter extends StatelessWidget {
   final String selected;
   final void Function(String) onSelect;
   const _CategoryFilter({required this.selected, required this.onSelect});
 
   static const _labels = [
-    'Tous', 'Burger', 'Pizza', 'Poulet', 'Africain', 'Grillades', 'Sandwich', 'Boulangerie',
+    'Tous',
+    'Burger',
+    'Pizza',
+    'Poulet',
+    'Africain',
+    'Grillades',
+    'Sandwich',
+    'Boulangerie',
   ];
   static const _icons = [
-    Icons.apps_rounded, Icons.lunch_dining_rounded, Icons.local_pizza_rounded, Icons.set_meal_rounded,
-    Icons.restaurant_rounded, Icons.outdoor_grill_rounded, Icons.fastfood_rounded, Icons.bakery_dining_rounded,
+    Icons.apps_rounded,
+    Icons.lunch_dining_rounded,
+    Icons.local_pizza_rounded,
+    Icons.set_meal_rounded,
+    Icons.restaurant_rounded,
+    Icons.outdoor_grill_rounded,
+    Icons.fastfood_rounded,
+    Icons.bakery_dining_rounded,
   ];
 
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final isDark = brightness == Brightness.dark;
+    final texts = AppTextStyles.textTheme(brightness);
 
     return Container(
       color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-      height: 60,
+      height: 104,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(AppSpacing.sm, 8, AppSpacing.sm, 8),
+        padding:
+            const EdgeInsets.fromLTRB(AppSpacing.sm, 8, AppSpacing.sm, 8),
         itemCount: _labels.length,
         itemBuilder: (_, i) {
           final label = _labels[i];
           final icon = _icons[i];
           final isSelected = selected == label;
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
             child: TapScale(
               haptic: HapticFeedbackType.selection,
               onTap: () => onSelect(label),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppColors.accent
-                      : (isDark ? AppColors.backgroundDark : AppColors.backgroundLight),
-                  borderRadius: AppRadius.chipRadius,
-                  boxShadow: isSelected ? AppShadows.strong(brightness) : null,
-                ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(icon, size: 14, color: isSelected ? Colors.white : AppColors.textSecondaryLight),
-                  const SizedBox(width: 6),
+              child: SizedBox(
+                width: 64,
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.accent
+                          : AppColors.categoryIconBg,
+                      shape: BoxShape.circle,
+                      boxShadow:
+                          isSelected ? AppShadows.strong(brightness) : null,
+                    ),
+                    child: Icon(icon,
+                        size: 24,
+                        color:
+                            isSelected ? Colors.white : AppColors.accentDark),
+                  ),
+                  const SizedBox(height: 6),
                   Text(
                     label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: texts.labelSmall?.copyWith(
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.w500,
                       color: isSelected
-                          ? Colors.white
-                          : (isDark ? AppColors.textSecondaryDark : AppColors.textPrimaryLight),
+                          ? AppColors.accent
+                          : (isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textPrimaryLight),
                     ),
                   ),
                 ]),
@@ -968,12 +1188,16 @@ class _PromoList extends StatelessWidget {
         height: 148,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, 4),
+          padding:
+              const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, 4),
           itemCount: items.length,
           itemBuilder: (_, i) => Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: _PromoCard(r: items[i], onTap: () => onTap(items[i])),
-          ).animate().fadeIn(duration: 300.ms, delay: (i * 60).ms).slideX(begin: 0.08, end: 0),
+          )
+              .animate()
+              .fadeIn(duration: 300.ms, delay: (i * 60).ms)
+              .slideX(begin: 0.08, end: 0),
         ),
       );
 }
@@ -1017,14 +1241,21 @@ class _PromoCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(8)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: BorderRadius.circular(8)),
                     child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.local_fire_department_rounded, size: 13, color: Colors.white),
+                      Icon(Icons.local_fire_department_rounded,
+                          size: 13, color: Colors.white),
                       SizedBox(width: 4),
                       Text('OFFRE SPÉCIALE',
                           style: TextStyle(
-                              color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5)),
                     ]),
                   ),
                   Column(
@@ -1033,17 +1264,29 @@ class _PromoCard extends StatelessWidget {
                       Text(r.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
                       Row(children: [
                         Text(r.style,
-                            style: const TextStyle(color: Color(0xFFFFCC99), fontSize: 12, fontWeight: FontWeight.w500)),
+                            style: const TextStyle(
+                                color: Color(0xFFFFCC99),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500)),
                         const Spacer(),
-                        const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFFB020)),
-                        Text(' ${r.rating.toStringAsFixed(1)}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                        const Icon(Icons.star_rounded,
+                            size: 12, color: Color(0xFFFFB020)),
+                        Text(' ${r.rating.toStringAsFixed(1)}',
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 12)),
                         const SizedBox(width: 8),
-                        const Icon(Icons.timer_rounded, size: 12, color: Colors.white70),
-                        Text(' ${r.deliveryTime}m', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                        const Icon(Icons.timer_rounded,
+                            size: 12, color: Colors.white70),
+                        Text(' ${r.deliveryTime}m',
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 12)),
                       ]),
                     ],
                   ),
@@ -1070,7 +1313,9 @@ class _Img extends StatelessWidget {
         width: width,
         height: height,
         color: AppColors.accent.withValues(alpha: 0.08),
-        child: const Center(child: Icon(Icons.restaurant_rounded, color: AppColors.accent, size: 30)));
+        child: const Center(
+            child: Icon(Icons.restaurant_rounded,
+                color: AppColors.accent, size: 30)));
 
     if (img.isEmpty) return fallback;
 
@@ -1080,13 +1325,18 @@ class _Img extends StatelessWidget {
         width: width,
         height: height,
         fit: BoxFit.cover,
-        placeholder: (_, __) => SkeletonLoader.image(width: width, height: height, radius: BorderRadius.zero),
+        placeholder: (_, __) => SkeletonLoader.image(
+            width: width, height: height, radius: BorderRadius.zero),
         errorWidget: (_, __, ___) => fallback,
       );
     }
 
     if (img.startsWith('assets/')) {
-      return Image.asset(img, width: width, height: height, fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback);
+      return Image.asset(img,
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => fallback);
     }
 
     return fallback;

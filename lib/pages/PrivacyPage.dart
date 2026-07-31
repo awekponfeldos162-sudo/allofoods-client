@@ -8,12 +8,14 @@ class PrivacyPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF121212) : Colors.white;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: bg,
       appBar: AppBar(
         title: const Text('Politique de confidentialité'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        backgroundColor: bg,
+        foregroundColor: isDark ? Colors.white : Colors.black87,
         elevation: 0,
       ),
       body: ListView(
@@ -84,13 +86,17 @@ class _PrivacyHeader extends StatelessWidget {
   const _PrivacyHeader();
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
@@ -102,23 +108,24 @@ class _PrivacyHeader extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
               borderRadius: BorderRadius.circular(12)),
-          child: const Icon(Icons.privacy_tip_outlined,
-              color: Colors.black87, size: 28),
+          child: Icon(Icons.privacy_tip_outlined, color: textColor, size: 28),
         ),
         const SizedBox(width: 14),
-        const Expanded(
+        Expanded(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Vos données nous importent',
                 style: TextStyle(
-                    color: Colors.black87,
+                    color: textColor,
                     fontSize: 15,
                     fontWeight: FontWeight.bold)),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Text('allofoods s\'engage à protéger votre vie privée',
-                style: TextStyle(color: Colors.black54, fontSize: 12)),
+                style: TextStyle(
+                    color: isDark ? Colors.grey.shade400 : Colors.black54,
+                    fontSize: 12)),
           ]),
         ),
       ]),
@@ -135,11 +142,14 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
@@ -150,20 +160,20 @@ class _Section extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Icon(icon, color: Colors.black54, size: 20),
+          Icon(icon, color: isDark ? Colors.grey.shade400 : Colors.black54, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(title,
-                style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87)),
+                style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.bold, color: textColor)),
           ),
         ]),
         const SizedBox(height: 10),
         Text(content,
             style: TextStyle(
-                fontSize: 13, color: Colors.grey.shade700, height: 1.6)),
+                fontSize: 13,
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+                height: 1.6)),
       ]),
     );
   }

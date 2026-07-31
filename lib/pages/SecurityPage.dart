@@ -136,6 +136,11 @@ class _SecurityPageState extends State<SecurityPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final subTextColor = isDark ? Colors.grey.shade400 : Colors.black54;
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.grey.shade50;
+    final borderColor = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -154,30 +159,31 @@ class _SecurityPageState extends State<SecurityPage> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: cardBg,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200)),
+                border: Border.all(color: borderColor)),
             child: Row(children: [
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                    color: Colors.grey.shade200, shape: BoxShape.circle),
-                child: const Icon(Icons.lock_outline,
-                    color: Colors.black87, size: 26),
+                    color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                    shape: BoxShape.circle),
+                child: Icon(Icons.lock_outline, color: textColor, size: 26),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Changer le mot de passe',
                           style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 15)),
-                      SizedBox(height: 2),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: textColor)),
+                      const SizedBox(height: 2),
                       Text(
                           'Utilisez un mot de passe fort\n(lettres, chiffres, symboles).',
-                          style:
-                              TextStyle(fontSize: 12, color: Colors.black54)),
+                          style: TextStyle(fontSize: 12, color: subTextColor)),
                     ]),
               ),
             ]),
@@ -270,19 +276,18 @@ class _SecurityPageState extends State<SecurityPage> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: cardBg,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.grey.shade200)),
+                border: Border.all(color: borderColor)),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Row(children: [
-                Icon(Icons.shield_outlined,
-                    color: Colors.black87, size: 16),
-                SizedBox(width: 6),
+              Row(children: [
+                Icon(Icons.shield_outlined, color: textColor, size: 16),
+                const SizedBox(width: 6),
                 Text('Conseils de sécurité',
                     style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color: textColor,
                         fontSize: 12)),
               ]),
               const SizedBox(height: 8),
@@ -294,12 +299,11 @@ class _SecurityPageState extends State<SecurityPage> {
               ].map((tip) => Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Row(children: [
-                      const Icon(Icons.check_circle_outline,
-                          size: 13, color: Colors.black54),
+                      Icon(Icons.check_circle_outline,
+                          size: 13, color: subTextColor),
                       const SizedBox(width: 6),
                       Text(tip,
-                          style: const TextStyle(
-                              fontSize: 11, color: Colors.black54)),
+                          style: TextStyle(fontSize: 11, color: subTextColor)),
                     ]),
                   )),
             ]),
@@ -326,34 +330,41 @@ class _PasswordField extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => TextField(
-        controller: ctrl,
-        obscureText: !visible,
-        onChanged: onChanged,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon:
-              const Icon(Icons.lock_outline, color: Colors.black54, size: 20),
-          suffixIcon: IconButton(
-            icon: Icon(
-                visible
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-                color: Colors.grey,
-                size: 20),
-            onPressed: onToggle,
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.grey.shade300)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.grey.shade300)),
-          focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Colors.black87, width: 2)),
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextField(
+      controller: ctrl,
+      obscureText: !visible,
+      onChanged: onChanged,
+      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(Icons.lock_outline,
+            color: isDark ? Colors.grey.shade400 : Colors.black54, size: 20),
+        suffixIcon: IconButton(
+          icon: Icon(
+              visible
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              color: Colors.grey,
+              size: 20),
+          onPressed: onToggle,
         ),
-      );
+        filled: true,
+        fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(
+                color: isDark ? Colors.grey.shade700 : Colors.grey.shade300)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(
+                color: isDark ? Colors.grey.shade700 : Colors.grey.shade300)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(
+                color: isDark ? Colors.white : Colors.black87, width: 2)),
+      ),
+    );
+  }
 }

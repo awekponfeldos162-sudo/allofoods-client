@@ -1,5 +1,5 @@
 ﻿// lib/pages/SupportPage.dart
-// ? Centre d'aide avec FAQ interactive + formulaire de contact Firestore
+// ✓ Centre d'aide avec FAQ interactive + formulaire de contact Firestore
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -37,7 +37,7 @@ class _SupportPageState extends State<SupportPage>
     {
       'q': 'Quels sont les modes de paiement ?',
       'a':
-          'Nous acceptons MTN MoMo, Moov Money, Celtiis Cash via KKiaPay, ainsi que le paiement en espéces à la livraison.',
+          'Nous acceptons MTN MoMo, Moov Money, Celtiis Cash via FedaPay, ainsi que le paiement en espèces à la livraison.',
     },
     {
       'q': 'Comment suivre ma commande en temps réel ?',
@@ -122,6 +122,13 @@ class _FaqTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final subTextColor = isDark ? Colors.grey.shade400 : Colors.black54;
+    final borderColor = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
+    final iconBgColor = isDark ? Colors.grey.shade800 : Colors.grey.shade50;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -130,24 +137,23 @@ class _FaqTab extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.grey.shade200)),
+              border: Border.all(color: borderColor)),
           child: Row(children: [
-            const Icon(Icons.emoji_objects_outlined,
-                color: Colors.black87, size: 32),
+            Icon(Icons.emoji_objects_outlined, color: textColor, size: 32),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Questions fréquentes',
                         style: TextStyle(
-                            color: Colors.black87,
+                            color: textColor,
                             fontWeight: FontWeight.bold,
                             fontSize: 16)),
                     Text('Trouvez une réponse rapide',
-                        style: TextStyle(color: Colors.black54, fontSize: 12)),
+                        style: TextStyle(color: subTextColor, fontSize: 12)),
                   ]),
             ),
           ]),
@@ -160,10 +166,12 @@ class _FaqTab extends StatelessWidget {
             duration: const Duration(milliseconds: 250),
             margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                  color: isOpen ? Colors.grey.shade300 : Colors.grey.shade100,
+                  color: isOpen
+                      ? (isDark ? Colors.grey.shade600 : Colors.grey.shade300)
+                      : (isDark ? Colors.grey.shade800 : Colors.grey.shade100),
                   width: isOpen ? 1.5 : 1),
               boxShadow: [
                 BoxShadow(
@@ -184,18 +192,18 @@ class _FaqTab extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                              color: Colors.grey.shade50,
+                              color: iconBgColor,
                               borderRadius: BorderRadius.circular(8)),
-                          child: const Icon(Icons.help_outline,
-                              color: Colors.black54, size: 16),
+                          child: Icon(Icons.help_outline,
+                              color: subTextColor, size: 16),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(e.value['q']!,
-                              style: const TextStyle(
+                              style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 13,
-                                  color: Colors.black87)),
+                                  color: textColor)),
                         ),
                         Icon(
                             isOpen
@@ -209,10 +217,8 @@ class _FaqTab extends StatelessWidget {
                         const Divider(height: 1),
                         const SizedBox(height: 12),
                         Text(e.value['a']!,
-                            style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.black87,
-                                height: 1.5)),
+                            style: TextStyle(
+                                fontSize: 13, color: textColor, height: 1.5)),
                       ],
                     ]),
               ),
@@ -225,16 +231,16 @@ class _FaqTab extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-              color: Colors.grey.shade50,
+              color: iconBgColor,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.grey.shade200)),
-          child: const Row(children: [
-            Icon(Icons.info_outline, color: Colors.black54, size: 18),
-            SizedBox(width: 10),
+              border: Border.all(color: borderColor)),
+          child: Row(children: [
+            Icon(Icons.info_outline, color: subTextColor, size: 18),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                   'Vous ne trouvez pas votre réponse ? Contactez-nous via l\'onglet Contact.',
-                  style: TextStyle(fontSize: 12, color: Colors.black54)),
+                  style: TextStyle(fontSize: 12, color: subTextColor)),
             ),
           ]),
         ),
@@ -371,20 +377,27 @@ class _ContactTabState extends State<_ContactTab> {
         const Text('Catégorie',
             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: _categories
-              .map((c) => ChoiceChip(
-                    label: Text(c),
-                    selected: _category == c,
-                    selectedColor: Colors.orange,
-                    labelStyle: TextStyle(
-                        color: _category == c ? Colors.white : Colors.black87,
-                        fontSize: 12),
-                    onSelected: (_) => setState(() => _category = c),
-                  ))
-              .toList(),
-        ),
+        Builder(builder: (context) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return Wrap(
+            spacing: 8,
+            children: _categories
+                .map((c) => ChoiceChip(
+                      label: Text(c),
+                      selected: _category == c,
+                      selectedColor: Colors.orange,
+                      backgroundColor:
+                          isDark ? const Color(0xFF1E1E1E) : null,
+                      labelStyle: TextStyle(
+                          color: _category == c
+                              ? Colors.white
+                              : (isDark ? Colors.white : Colors.black87),
+                          fontSize: 12),
+                      onSelected: (_) => setState(() => _category = c),
+                    ))
+                .toList(),
+          );
+        }),
         const SizedBox(height: 16),
 
         // Sujet
@@ -393,8 +406,8 @@ class _ContactTabState extends State<_ContactTab> {
         const SizedBox(height: 8),
         TextField(
           controller: _subjectCtrl,
-          decoration:
-              _deco('Décrivez briévement le problème', Icons.subject_outlined),
+          decoration: _deco(
+              context, 'Décrivez brièvement le problème', Icons.subject_outlined),
         ),
         const SizedBox(height: 16),
 
@@ -405,8 +418,8 @@ class _ContactTabState extends State<_ContactTab> {
         TextField(
           controller: _msgCtrl,
           maxLines: 5,
-          decoration:
-              _deco('Détaillez votre problème...', Icons.message_outlined),
+          decoration: _deco(
+              context, 'Détaillez votre problème...', Icons.message_outlined),
         ),
         const SizedBox(height: 24),
 
@@ -434,21 +447,28 @@ class _ContactTabState extends State<_ContactTab> {
     );
   }
 
-  InputDecoration _deco(String hint, IconData icon) => InputDecoration(
-        hintText: hint,
-        prefixIcon: Icon(icon, color: Colors.black54, size: 20),
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: Colors.grey.shade300)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: Colors.grey.shade300)),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.black87, width: 2)),
-      );
+  InputDecoration _deco(BuildContext context, String hint, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InputDecoration(
+      hintText: hint,
+      prefixIcon: Icon(icon,
+          color: isDark ? Colors.grey.shade400 : Colors.black54, size: 20),
+      filled: true,
+      fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(
+              color: isDark ? Colors.grey.shade700 : Colors.grey.shade300)),
+      enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(
+              color: isDark ? Colors.grey.shade700 : Colors.grey.shade300)),
+      focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(
+              color: isDark ? Colors.white : Colors.black87, width: 2)),
+    );
+  }
 }
 
 class _ContactChip extends StatelessWidget {
@@ -459,24 +479,28 @@ class _ContactChip extends StatelessWidget {
       {required this.icon, required this.label, required this.color});
 
   @override
-  Widget build(BuildContext context) => Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-          decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200)),
-          child: Row(children: [
-            Icon(icon, color: Colors.black54, size: 16),
-            const SizedBox(width: 6),
-            Expanded(
-                child: Text(label,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis)),
-          ]),
-        ),
-      );
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+                color: isDark ? Colors.grey.shade800 : Colors.grey.shade200)),
+        child: Row(children: [
+          Icon(icon, color: isDark ? Colors.grey.shade400 : Colors.black54, size: 16),
+          const SizedBox(width: 6),
+          Expanded(
+              child: Text(label,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? Colors.white : Colors.black87,
+                      fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis)),
+        ]),
+      ),
+    );
+  }
 }

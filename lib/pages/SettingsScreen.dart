@@ -6,14 +6,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_2/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/language_provider.dart';
 import '../l10n/app_localizations.dart';
+import '../services/biometric_service.dart';
 import 'SecurityPage.dart';
 import 'SupportPage.dart';
 import 'PrivacyPage.dart';
 import 'OrderHistoryPage.dart';
+import 'SavedAddressesPage.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -22,19 +26,86 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  static const _kNotifOrdersKey = 'notif_orders_enabled';
+  static const _kNotifPromosKey = 'notif_promos_enabled';
+
   bool _notifOrders = true;
   bool _notifPromos = false;
+  bool _biometricEnabled = false;
+  bool _biometricSupported = false;
+  bool _loadingPrefs = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrefs();
+  }
+
+  Future<void> _loadPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final biometricSupported = await BiometricService.isDeviceSupported();
+    final biometricEnabled = await BiometricService.isEnabled();
+    if (!mounted) return;
+    setState(() {
+      _notifOrders = prefs.getBool(_kNotifOrdersKey) ?? true;
+      _notifPromos = prefs.getBool(_kNotifPromosKey) ?? false;
+      _biometricSupported = biometricSupported;
+      _biometricEnabled = biometricEnabled && biometricSupported;
+      _loadingPrefs = false;
+    });
+  }
+
+  Future<void> _toggleOrderNotifs(bool value) async {
+    setState(() => _notifOrders = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kNotifOrdersKey, value);
+  }
+
+  // Contrôle réel : abonne/désabonne le topic FCM 'promotions' (pas
+  // seulement un booléen local qui n'avait aucun effet auparavant).
+  Future<void> _togglePromoNotifs(bool value) async {
+    setState(() => _notifPromos = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kNotifPromosKey, value);
+    try {
+      if (value) {
+        await FirebaseMessaging.instance.subscribeToTopic('promotions');
+      } else {
+        await FirebaseMessaging.instance.unsubscribeFromTopic('promotions');
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _toggleBiometric(bool value) async {
+    if (!_biometricSupported) {
+      _snack(
+          'Aucune biométrie configurée sur cet appareil — activez-la dans les paramètres du téléphone.',
+          error: true);
+      return;
+    }
+    if (value) {
+      final ok = await BiometricService.authenticate(
+          reason: 'Confirmez votre identité pour activer le déverrouillage biométrique');
+      if (!ok) {
+        if (mounted) _snack('Authentification annulée ou échouée', error: true);
+        return;
+      }
+    }
+    await BiometricService.setEnabled(value);
+    if (mounted) setState(() => _biometricEnabled = value);
+  }
 
   @override
   Widget build(BuildContext context) {
     final lang = context.watch<LanguageProvider>();
     final t = AppLocalizations.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(t.settings),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.black87,
+        foregroundColor: isDark ? Colors.white : Colors.black87,
         elevation: 0,
       ),
       body: ListView.separated(
@@ -62,7 +133,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             iconColor: Colors.blue,
             title: t.savedAddresses,
             subtitle: t.savedAddressesSub,
-            onTap: () => _snack('Bientôt disponible / Coming soon'),
+            onTap: () => _goTo(const SavedAddressesPage()),
           ),
           SettingsTile(
             icon: Icons.receipt_long_outlined,
@@ -87,11 +158,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.fingerprint,
             iconColor: Colors.purple,
             title: t.biometric,
-            subtitle: t.biometricSub,
+            subtitle: _biometricSupported
+                ? t.biometricSub
+                : 'Non disponible sur cet appareil',
             trailing: Switch(
-              value: false,
+              value: _biometricEnabled,
               activeThumbColor: Colors.orange,
-              onChanged: (_) => _snack(t.biometric),
+              onChanged: _loadingPrefs ? null : _toggleBiometric,
             ),
           ),
         ]),
@@ -107,7 +180,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: Switch(
               value: _notifOrders,
               activeThumbColor: Colors.orange,
-              onChanged: (v) => setState(() => _notifOrders = v),
+              onChanged: _loadingPrefs ? null : _toggleOrderNotifs,
             ),
           ),
           SettingsTile(
@@ -118,7 +191,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: Switch(
               value: _notifPromos,
               activeThumbColor: Colors.orange,
-              onChanged: (v) => setState(() => _notifPromos = v),
+              onChanged: _loadingPrefs ? null : _togglePromoNotifs,
             ),
           ),
         ]),
@@ -164,13 +237,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: t.reportIssue,
             subtitle: t.reportIssueSub,
             onTap: () => _goTo(const SupportPage()),
-          ),
-          SettingsTile(
-            icon: Icons.wifi_outlined,
-            iconColor: Colors.green,
-            title: t.checkConnection,
-            subtitle: t.checkConnectionSub,
-            onTap: () => _checkConnectivity(),
           ),
         ]),
 
@@ -245,46 +311,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ));
   }
 
-  Future<void> _checkConnectivity() async {
-    _snack('Vérification en cours...');
-    try {
-      final snap = await FirebaseFirestore.instance
-          .collection('restaurants')
-          .limit(1)
-          .get();
-      _snack(snap.docs.isNotEmpty
-          ? '? Connexion Firebase OK !'
-          : '?? Firebase accessible mais vide');
-    } catch (_) {
-      _snack('? Impossible de joindre Firebase', error: true);
-    }
-  }
-
   void _showLanguagePicker(LanguageProvider lang, AppLocalizations t) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => Container(
-        decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
               margin: const EdgeInsets.only(top: 12),
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: isDark ? Colors.grey[700] : Colors.grey[300],
                   borderRadius: BorderRadius.circular(2))),
           Padding(
               padding: const EdgeInsets.all(16),
               child: Text(t.chooseLanguage,
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold))),
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87))),
           ...LanguageProvider.supported.entries.map((e) => ListTile(
                 leading: Text(e.value.split('  ')[0],
                     style: const TextStyle(fontSize: 24)),
-                title: Text(e.value.split('  ')[1]),
+                title: Text(e.value.split('  ')[1],
+                    style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87)),
                 trailing: lang.locale.languageCode == e.key
                     ? const Icon(Icons.check, color: Colors.orange)
                     : null,
@@ -339,7 +395,6 @@ class _ProfileInfoPageState extends State<_ProfileInfoPage> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   bool _loading = true;
-  bool _saving = false;
 
   @override
   void initState() {
@@ -371,87 +426,50 @@ class _ProfileInfoPageState extends State<_ProfileInfoPage> {
     if (mounted) setState(() => _loading = false);
   }
 
-  // Sauvegarde dans Firestore + Firebase Auth displayName
-  Future<void> _save() async {
-    final name = _nameCtrl.text.trim();
-    final phone = _phoneCtrl.text.trim();
-    if (name.isEmpty) {
-      _snack('Le nom ne peut pas être vide', error: true);
-      return;
-    }
-    setState(() => _saving = true);
-    try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid != null) {
-        await Future.wait([
-          FirebaseFirestore.instance
-              .collection('users')
-              .doc(uid)
-              .update({'name': name, 'phone': phone}),
-          FirebaseAuth.instance.currentUser!.updateDisplayName(name),
-        ]);
-      }
-      if (!mounted) return;
-      _snack('? Profil mis à jour !');
-      Navigator.pop(context);
-    } catch (e) {
-      if (mounted) _snack('Erreur : $e', error: true);
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  void _snack(String msg, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: error ? Colors.red : Colors.green,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ));
-  }
-
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
           title: const Text('Informations personnelles'),
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          foregroundColor: Colors.black87,
+          foregroundColor: isDark ? Colors.white : Colors.black87,
           elevation: 0),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: Colors.orange))
           : Padding(
               padding: const EdgeInsets.all(20),
-              child: Column(children: [
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12)),
+                  child: Row(children: [
+                    const Icon(Icons.lock_outline, color: Colors.orange, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                          'Ces informations sont verrouillées. Contactez le support pour les modifier.',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? Colors.white : Colors.black87)),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 20),
                 _Field(
                     ctrl: _nameCtrl,
                     label: 'Nom complet',
-                    icon: Icons.person_outline),
+                    icon: Icons.person_outline,
+                    readOnly: true),
                 const SizedBox(height: 16),
                 _Field(
                     ctrl: _phoneCtrl,
                     label: 'Téléphone',
                     icon: Icons.phone_outlined,
-                    keyboard: TextInputType.phone),
-                const SizedBox(height: 32),
-                ElevatedButton(
-                  onPressed: _saving ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 52),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14))),
-                  child: _saving
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2))
-                      : const Text('Enregistrer',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16)),
-                ),
+                    keyboard: TextInputType.phone,
+                    readOnly: true),
               ]),
             ),
     );
@@ -463,35 +481,48 @@ class _Field extends StatelessWidget {
   final String label;
   final IconData icon;
   final TextInputType keyboard;
+  final bool readOnly;
   const _Field(
       {required this.ctrl,
       required this.label,
       required this.icon,
-      this.keyboard = TextInputType.text});
+      this.keyboard = TextInputType.text,
+      this.readOnly = false});
 
   @override
-  Widget build(BuildContext context) => TextField(
-        controller: ctrl,
-        keyboardType: keyboard,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon, color: Colors.orange),
-          filled: true,
-          fillColor: Colors.grey.shade50,
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.grey.shade300)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.grey.shade300)),
-          focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Colors.orange, width: 2)),
-        ),
-      );
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextField(
+      controller: ctrl,
+      keyboardType: keyboard,
+      readOnly: readOnly,
+      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: Colors.orange),
+        suffixIcon: readOnly
+            ? Icon(Icons.lock_outline,
+                size: 18, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400)
+            : null,
+        filled: true,
+        fillColor: isDark ? Colors.grey.shade800 : Colors.grey.shade50,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(
+                color: isDark ? Colors.grey.shade700 : Colors.grey.shade300)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(
+                color: isDark ? Colors.grey.shade700 : Colors.grey.shade300)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Colors.orange, width: 2)),
+      ),
+    );
+  }
 }
 
-// WIDGETS RéUTILISABLES
+// WIDGETS RÉUTILISABLES
 class _SectionHeader extends StatelessWidget {
   final String title;
   const _SectionHeader(this.title);

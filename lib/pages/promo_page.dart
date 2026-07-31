@@ -58,18 +58,20 @@ class _PromoPageState extends State<PromoPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF121212) : Colors.white;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: bg,
       appBar: AppBar(
         title: const Text('Plein de promos 🎉',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        backgroundColor: bg,
+        foregroundColor: isDark ? Colors.white : Colors.black87,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        systemOverlayStyle: const SystemUiOverlayStyle(
+        systemOverlayStyle: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         ),
       ),
       body: _loading
@@ -108,6 +110,7 @@ class _PromoRestaurantCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Consumer<FavoritesProvider>(
       builder: (_, favs, __) {
         final isFav = favs.isFavRestaurant(r.id);
@@ -123,7 +126,7 @@ class _PromoRestaurantCard extends StatelessWidget {
           child: Container(
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
@@ -244,8 +247,10 @@ class _PromoRestaurantCard extends StatelessWidget {
                   Text(r.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.bold)),
+                      style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87)),
                   const SizedBox(height: 4),
 
                   // Note + livraison
@@ -254,17 +259,19 @@ class _PromoRestaurantCard extends StatelessWidget {
                         size: 15, color: Colors.amber),
                     const SizedBox(width: 3),
                     Text(r.rating.toStringAsFixed(1),
-                        style: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.bold)),
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black87)),
                     const SizedBox(width: 12),
                     const Icon(Icons.shopping_bag_outlined,
                         size: 15, color: Colors.blue),
                     const SizedBox(width: 3),
                     Text('Min ${r.minOrder} F',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Colors.black87)),
+                            color: isDark ? Colors.white : Colors.black87)),
                   ]),
                   const SizedBox(height: 8),
 
@@ -279,12 +286,17 @@ class _PromoRestaurantCard extends StatelessWidget {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 9, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: Colors.grey.shade100,
+                                  color: isDark
+                                      ? Colors.grey.shade800
+                                      : Colors.grey.shade100,
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(tag,
-                                    style: const TextStyle(
-                                        fontSize: 11, color: Colors.black54)),
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark
+                                            ? Colors.grey.shade300
+                                            : Colors.black54)),
                               ))
                           .toList(),
                     ),

@@ -10,9 +10,11 @@ import 'package:provider/provider.dart';
 import 'RestaurantProfilPage.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/restaurant_model.dart';
+import '../theme/app_theme.dart';
 
 class RestaurantPage extends StatefulWidget {
-  const RestaurantPage({super.key});
+  final String? sectionTitle;
+  const RestaurantPage({super.key, this.sectionTitle});
   @override
   State<RestaurantPage> createState() => _RestaurantPageState();
 }
@@ -132,11 +134,19 @@ class _RestaurantPageState extends State<RestaurantPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF121212) : Colors.white;
-    final searchBg = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final bg = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final searchBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final fieldFill = isDark ? AppColors.fieldFillDark : AppColors.fieldFillLight;
 
     return Scaffold(
       backgroundColor: bg,
+      appBar: AppBar(
+        title: Text(widget.sectionTitle ?? 'Restaurants'),
+        backgroundColor: bg,
+        foregroundColor: isDark ? Colors.white : Colors.black87,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+      ),
       body: Column(children: [
         // Barre de recherche
         Container(
@@ -151,7 +161,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
               decoration: InputDecoration(
                 hintText: 'Rechercher un restaurant...',
                 hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                prefixIcon: const Icon(Icons.search, color: Colors.orange),
+                prefixIcon: const Icon(Icons.search, color: AppColors.accent),
                 suffixIcon: _query.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear, color: Colors.grey),
@@ -161,14 +171,13 @@ class _RestaurantPageState extends State<RestaurantPage> {
                         })
                     : null,
                 filled: true,
-                fillColor:
-                    isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade50,
+                fillColor: fieldFill,
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(30),
                     borderSide: BorderSide.none),
                 enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(30),
-                    borderSide: BorderSide(color: Colors.grey.shade200)),
+                    borderSide: BorderSide.none),
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
               ),
             ),
@@ -217,37 +226,41 @@ class _RestaurantPageState extends State<RestaurantPage> {
         // Compteur + Tri
         if (!_loading)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 8, 6),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
             child: Row(children: [
               Text(
                   '${_results.length} restaurant${_results.length > 1 ? "s" : ""}',
                   style: TextStyle(
                       color: Colors.grey.shade600,
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w500)),
               const Spacer(),
-              DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _sortBy,
-                  isDense: true,
-                  borderRadius: BorderRadius.circular(12),
-                  style: const TextStyle(
-                      color: Colors.orange,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600),
-                  icon:
-                      const Icon(Icons.sort, color: Colors.orange, size: 16),
-                  items: ['Note', 'Temps', 'Distance']
-                      .map((s) =>
-                          DropdownMenuItem(value: s, child: Text(s)))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) {
-                      HapticFeedback.selectionClick();
-                      setState(() => _sortBy = v);
-                      _filter();
-                    }
-                  },
+              PopupMenuButton<String>(
+                initialValue: _sortBy,
+                borderRadius: BorderRadius.circular(14),
+                onSelected: (v) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _sortBy = v);
+                  _filter();
+                },
+                itemBuilder: (_) => ['Note', 'Temps', 'Distance']
+                    .map((s) => PopupMenuItem(value: s, child: Text(s)))
+                    .toList(),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                      color: isDark ? AppColors.fieldFillDark : AppColors.fieldFillLight,
+                      borderRadius: BorderRadius.circular(20)),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.tune_rounded, color: AppColors.accent, size: 15),
+                    SizedBox(width: 5),
+                    Text('Trier',
+                        style: TextStyle(
+                            color: AppColors.accent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700)),
+                  ]),
                 ),
               ),
             ]),
@@ -269,7 +282,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
                           crossAxisCount: 2,
                           crossAxisSpacing: 10,
                           mainAxisSpacing: 10,
-                          childAspectRatio: 0.72,
+                          childAspectRatio: 0.68,
                         ),
                         itemCount: _results.length,
                         itemBuilder: (_, i) =>
@@ -296,7 +309,7 @@ class _ShimmerGrid extends StatelessWidget {
           crossAxisCount: 2,
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
-          childAspectRatio: 0.72,
+          childAspectRatio: 0.68,
         ),
         itemCount: 6,
         itemBuilder: (_, __) => Container(
@@ -379,6 +392,20 @@ class _RestaurantCard extends StatelessWidget {
                             : []),
                     height: 115,
                   ),
+                  if (!restaurant.isActive)
+                    Container(
+                      height: 115,
+                      color: Colors.black.withValues(alpha: 0.45),
+                      alignment: Alignment.center,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                            color: AppColors.error, borderRadius: BorderRadius.circular(20)),
+                        child: const Text('Fermé',
+                            style: TextStyle(
+                                color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
                   Positioned(
                       top: 8,
                       left: 8,
@@ -418,14 +445,24 @@ class _RestaurantCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                               fontSize: 13, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 2),
-                      Text(restaurant.style,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: Colors.orange.shade600,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 3),
+                      Row(children: [
+                        Expanded(
+                          child: Text(restaurant.style,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: Colors.orange.shade600,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500)),
+                        ),
+                        if (restaurant.rating > 0) ...[
+                          const Icon(Icons.star_rounded, size: 13, color: Color(0xFFFFB020)),
+                          const SizedBox(width: 1),
+                          Text(restaurant.rating.toStringAsFixed(1),
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
+                      ]),
                       const SizedBox(height: 4),
                       Row(children: [
                         const Icon(Icons.location_on_outlined,

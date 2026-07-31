@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../l10n/app_localizations.dart';
+import '../theme/app_theme.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -368,31 +369,51 @@ class _LoginPageState extends State<LoginPage>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fieldFill = isDark ? AppColors.fieldFillDark : AppColors.fieldFillLight;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(children: [
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             // Logo
             Image.asset('assets/images/logo.png',
-                width: 130, height: 130, fit: BoxFit.contain),
-            const SizedBox(height: 28),
+                width: 110, height: 110, fit: BoxFit.contain),
+            const SizedBox(height: 10),
+            Text('Commandez vos plats favoris 🍱',
+                style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
+            const SizedBox(height: 26),
 
-            // Tabs
+            // Tabs — pill sélecteur
             Container(
+              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12)),
+                  color: fieldFill,
+                  borderRadius: BorderRadius.circular(16)),
               child: TabBar(
                 controller: _tabController,
                 indicator: BoxDecoration(
-                    color: Colors.orange,
-                    borderRadius: BorderRadius.circular(12)),
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(13),
+                    boxShadow: [
+                      BoxShadow(
+                          color: AppColors.accent.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3)),
+                    ]),
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                splashBorderRadius: BorderRadius.circular(13),
                 labelColor: Colors.white,
-                unselectedLabelColor: Colors.grey,
+                unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                 tabs: [
                   Tab(text: AppLocalizations.of(context).signIn),
                   Tab(text: AppLocalizations.of(context).signUp),
@@ -548,6 +569,8 @@ class _PhoneField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fieldFill = isDark ? AppColors.fieldFillDark : AppColors.fieldFillLight;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       TextField(
         controller: ctrl,
@@ -555,7 +578,7 @@ class _PhoneField extends StatelessWidget {
         maxLength: 8,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         onChanged: onChange,
-        style: const TextStyle(color: Colors.black87),
+        style: TextStyle(color: isDark ? Colors.white : Colors.black87),
         decoration: InputDecoration(
           hintText: 'XX XX XX XX',
           labelText: 'Numéro de téléphone',
@@ -564,33 +587,32 @@ class _PhoneField extends StatelessWidget {
             margin: const EdgeInsets.only(right: 4),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.orange.shade50,
+              color: AppColors.accent.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: Colors.orange.shade300),
+              border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
             ),
             child: Text('01',
                 style: TextStyle(
-                    color: Colors.orange.shade700,
+                    color: AppColors.accent,
                     fontWeight: FontWeight.bold,
                     fontSize: 15)),
           ),
           prefixIcon: Icon(Icons.phone_outlined,
-              color: error != null ? Colors.red : Colors.orange),
+              color: error != null ? Colors.red : AppColors.accent),
           filled: true,
-          fillColor: error != null ? Colors.red.shade50 : Colors.grey.shade50,
+          fillColor: error != null ? Colors.red.shade50 : fieldFill,
           counterText: '',
           border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                  color: error != null ? Colors.red : Colors.grey.shade300)),
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none),
           enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                  color: error != null ? Colors.red : Colors.grey.shade300)),
+                  color: error != null ? Colors.red : Colors.transparent)),
           focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                  color: error != null ? Colors.red : Colors.orange,
+                  color: error != null ? Colors.red : AppColors.accent,
                   width: 2)),
         ),
       ),
@@ -739,7 +761,10 @@ class _Field extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Column(
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fieldFill = isDark ? AppColors.fieldFillDark : AppColors.fieldFillLight;
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextField(
@@ -748,11 +773,12 @@ class _Field extends StatelessWidget {
             keyboardType: keyboard,
             onChanged: onChange,
             inputFormatters: formatters,
-            style: const TextStyle(color: Colors.black87),
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
             decoration: InputDecoration(
               hintText: hint,
+              hintStyle: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey.shade500),
               prefixIcon: Icon(icon,
-                  color: error != null ? Colors.red : Colors.orange),
+                  color: error != null ? Colors.red : AppColors.accent),
               suffixIcon: isPass
                   ? IconButton(
                       icon: Icon(
@@ -765,23 +791,18 @@ class _Field extends StatelessWidget {
                   : null,
               filled: true,
               fillColor:
-                  error != null ? Colors.red.shade50 : Colors.grey.shade50,
+                  error != null ? Colors.red.shade50 : fieldFill,
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                      color: error != null
-                          ? Colors.red
-                          : Colors.grey.shade300)),
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none),
               enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide(
-                      color: error != null
-                          ? Colors.red
-                          : Colors.grey.shade300)),
+                      color: error != null ? Colors.red : Colors.transparent)),
               focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide(
-                      color: error != null ? Colors.red : Colors.orange,
+                      color: error != null ? Colors.red : AppColors.accent,
                       width: 2)),
             ),
           ),
@@ -798,6 +819,7 @@ class _Field extends StatelessWidget {
             ),
         ],
       );
+  }
 }
 
 class _Btn extends StatelessWidget {
@@ -813,9 +835,10 @@ class _Btn extends StatelessWidget {
         child: ElevatedButton(
           onPressed: loading ? null : onTap,
           style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
+              backgroundColor: AppColors.accent,
+              elevation: 0,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12))),
+                  borderRadius: BorderRadius.circular(16))),
           child: loading
               ? const SizedBox(
                   width: 24,
@@ -853,26 +876,29 @@ class _GoogleBtn extends StatelessWidget {
   const _GoogleBtn({required this.onTap, required this.loading});
 
   @override
-  Widget build(BuildContext context) => SizedBox(
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SizedBox(
         width: double.infinity,
         height: 52,
         child: OutlinedButton(
           onPressed: loading ? null : onTap,
           style: OutlinedButton.styleFrom(
-              side: BorderSide(color: Colors.grey.shade300),
+              side: BorderSide(color: isDark ? Colors.grey.shade700 : Colors.grey.shade300),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              backgroundColor: Colors.white),
+                  borderRadius: BorderRadius.circular(16)),
+              backgroundColor: isDark ? AppColors.surfaceDark : Colors.white),
           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             SvgPicture.asset('assets/images/google-logo.svg',
                 width: 24, height: 24),
             const SizedBox(width: 12),
-            const Text('Continuer avec Google',
+            Text('Continuer avec Google',
                 style: TextStyle(
-                    color: Colors.black87,
+                    color: isDark ? Colors.white : Colors.black87,
                     fontWeight: FontWeight.w600,
                     fontSize: 15)),
           ]),
         ),
       );
+  }
 }

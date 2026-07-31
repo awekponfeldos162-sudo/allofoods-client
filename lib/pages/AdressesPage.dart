@@ -52,9 +52,10 @@ class _AdressesPageState extends State<AdressesPage>
   }
 
   void _showCreateModal() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => SafeArea(
@@ -70,14 +71,16 @@ class _AdressesPageState extends State<AdressesPage>
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-              const Text('Créer',
+              Text('Créer',
                   style: TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.bold)),
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87)),
               const SizedBox(height: 20),
               _SheetOption(
                 icon: Icons.add_location_alt_outlined,
@@ -108,11 +111,12 @@ class _AdressesPageState extends State<AdressesPage>
     final label = data['label'] as String? ?? 'Adresse';
     final address = data['address'] as String? ?? '';
     final phone = data['phone'] as String? ?? '';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => SafeArea(
@@ -125,7 +129,7 @@ class _AdressesPageState extends State<AdressesPage>
               height: 4,
               margin: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -140,10 +144,11 @@ class _AdressesPageState extends State<AdressesPage>
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.close, size: 18),
+                    child: Icon(Icons.close,
+                        size: 18, color: isDark ? Colors.white : Colors.black87),
                   ),
                 ),
               ),
@@ -154,14 +159,19 @@ class _AdressesPageState extends State<AdressesPage>
               child: Column(
                 children: [
                   Text(label,
-                      style: const TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.bold)),
+                      style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87)),
                   const SizedBox(height: 6),
                   Text(
                     [address, if (phone.isNotEmpty) 'Tel. $phone'].join('\n'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                        fontSize: 13, color: Colors.grey.shade600),
+                        fontSize: 13,
+                        color: isDark
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600),
                   ),
                 ],
               ),
@@ -234,16 +244,18 @@ class _AdressesPageState extends State<AdressesPage>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor:
+          isDark ? const Color(0xFF121212) : Colors.grey.shade100,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
         elevation: 0,
         titleSpacing: 20,
         automaticallyImplyLeading: false,
-        title: const Text('Adresses',
+        title: Text('Adresses',
             style: TextStyle(
-                color: Colors.black,
+                color: isDark ? Colors.white : Colors.black,
                 fontWeight: FontWeight.bold,
                 fontSize: 22)),
         bottom: TabBar(
@@ -331,24 +343,28 @@ class _SavedTab extends StatelessWidget {
           return lbl.contains(query) || adr.contains(query);
         }).toList();
 
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
           children: [
             // Barre recherche
             Container(
               decoration: BoxDecoration(
-                color: Colors.grey.shade200,
+                color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: TextField(
                 controller: searchCtrl,
-                decoration: const InputDecoration(
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                decoration: InputDecoration(
                   hintText: 'Rechercher une adresse',
-                  hintStyle: TextStyle(fontSize: 14, color: Colors.grey),
-                  prefixIcon:
-                      Icon(Icons.search, color: Colors.black54, size: 20),
+                  hintStyle: const TextStyle(fontSize: 14, color: Colors.grey),
+                  prefixIcon: Icon(Icons.search,
+                      color: isDark ? Colors.grey.shade400 : Colors.black54,
+                      size: 20),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),
@@ -357,7 +373,7 @@ class _SavedTab extends StatelessWidget {
             // Card shortcuts Domicile + Travail
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardColor,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Column(
@@ -377,7 +393,7 @@ class _SavedTab extends StatelessWidget {
                   Divider(
                       height: 1,
                       indent: 56,
-                      color: Colors.grey.shade200),
+                      color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
                   _ShortcutTile(
                     icon: Icons.work_outline,
                     label: 'Travail',
@@ -399,7 +415,7 @@ class _SavedTab extends StatelessWidget {
               const SizedBox(height: 12),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardColor,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Column(
@@ -420,7 +436,9 @@ class _SavedTab extends StatelessWidget {
                         Divider(
                             height: 1,
                             indent: 56,
-                            color: Colors.grey.shade200),
+                            color: isDark
+                                ? Colors.grey.shade800
+                                : Colors.grey.shade200),
                     ],
                   ],
                 ),
@@ -504,18 +522,22 @@ class _ShortcutTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
     return ListTile(
       contentPadding:
           const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-      leading: Icon(icon, size: 22, color: Colors.black87),
+      leading: Icon(icon, size: 22, color: textColor),
       title: Text(label,
-          style:
-              const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+          style: TextStyle(
+              fontWeight: FontWeight.w600, fontSize: 15, color: textColor)),
       subtitle: Text(
         subtitle,
         style: TextStyle(
             fontSize: 12,
-            color: isSet ? Colors.black54 : Colors.grey.shade500),
+            color: isSet
+                ? (isDark ? Colors.grey.shade400 : Colors.black54)
+                : Colors.grey.shade500),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
@@ -536,22 +558,24 @@ class _SheetOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding:
             const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         decoration: BoxDecoration(
-          color: Colors.grey.shade100,
+          color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: Colors.black87),
+            Icon(icon, size: 20, color: textColor),
             const SizedBox(width: 14),
             Text(label,
-                style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w500)),
+                style: TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w500, color: textColor)),
           ],
         ),
       ),
@@ -569,6 +593,8 @@ class _ActionCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -577,13 +603,13 @@ class _ActionCircle extends StatelessWidget {
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 22, color: Colors.black87),
+            child: Icon(icon, size: 22, color: textColor),
           ),
           const SizedBox(height: 6),
-          Text(label, style: const TextStyle(fontSize: 12)),
+          Text(label, style: TextStyle(fontSize: 12, color: textColor)),
         ],
       ),
     );
@@ -600,9 +626,13 @@ class _OptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
-      leading: Icon(icon, size: 20, color: Colors.black54),
-      title: Text(label, style: const TextStyle(fontSize: 14)),
+      leading: Icon(icon,
+          size: 20, color: isDark ? Colors.grey.shade400 : Colors.black54),
+      title: Text(label,
+          style: TextStyle(
+              fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
       trailing:
           const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
       onTap: onTap,
