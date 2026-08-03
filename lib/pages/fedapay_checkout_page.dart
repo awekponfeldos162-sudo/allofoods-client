@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../services/fedapay_service.dart';
+import '../services/secure_screen_service.dart';
 import '../l10n/app_localizations.dart';
 
 class FedaPayCheckoutPage extends StatefulWidget {
@@ -34,6 +35,7 @@ class _FedaPayCheckoutPageState extends State<FedaPayCheckoutPage> {
   @override
   void initState() {
     super.initState();
+    SecureScreenService.enable();
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -71,6 +73,7 @@ class _FedaPayCheckoutPageState extends State<FedaPayCheckoutPage> {
 
   @override
   void dispose() {
+    SecureScreenService.disable();
     _pollTimer?.cancel();
     super.dispose();
   }

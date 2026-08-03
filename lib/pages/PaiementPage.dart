@@ -17,6 +17,7 @@ import '../models/delivery_model.dart'
 import '../services/fedapay_service.dart';
 import '../services/local_notification_service.dart';
 import '../services/payment_service.dart';
+import '../services/secure_screen_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/premium/premium.dart';
 import 'WaitingPage.dart';
@@ -108,10 +109,15 @@ class _PaiementPageState extends State<PaiementPage> {
   void initState() {
     super.initState();
     _phoneCtrl.addListener(_onPhoneChanged);
+    // Empêche captures d'écran/enregistrement pendant le paiement (numéro
+    // Mobile Money, montants) — désactivé au dispose, jamais laissé actif
+    // ailleurs dans l'app.
+    SecureScreenService.enable();
   }
 
   @override
   void dispose() {
+    SecureScreenService.disable();
     _paymentPollTimer?.cancel();
     _phoneCtrl.removeListener(_onPhoneChanged);
     _phoneCtrl.dispose();

@@ -1,4 +1,4 @@
-﻿// lib/pages/ProfilPage.dart
+// lib/pages/ProfilPage.dart
 // ✅ Affiche toutes les infos depuis Firestore
 // Upload photo Supabase Storage
 
@@ -182,7 +182,8 @@ class _ProfilPageState extends State<ProfilPage> {
           Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text(t.profilePhoto,
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold))),
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.bold))),
           ListTile(
             leading: Container(
                 padding: const EdgeInsets.all(8),
@@ -274,154 +275,172 @@ class _ProfilPageState extends State<ProfilPage> {
           child: CircularProgressIndicator(color: Colors.orange));
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: Theme.of(context).scaffoldBackgroundColor,
-      child: RefreshIndicator(
-        color: Colors.orange,
-        onRefresh: _loadProfile,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-          children: [
-            // Header compact
-            _buildHeader(),
-            const SizedBox(height: 20),
+      child: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          color: Colors.orange,
+          onRefresh: _loadProfile,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 4, 16),
+                child: Text(AppLocalizations.of(context).profile,
+                    style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black87)),
+              ),
+              // Header compact
+              _buildHeader(),
+              const SizedBox(height: 20),
 
-            _Card(
-              title: AppLocalizations.of(context).personalInfo,
-              icon: Icons.person_outline,
-              child: Column(children: [
-                _InfoTile(
-                  icon: Icons.badge_outlined,
-                  label: AppLocalizations.of(context).fullName,
-                  ctrl: _nameCtrl,
-                  editable: _editing,
-                ),
-                _divider(),
-                _ReadTile(
-                  icon: Icons.email_outlined,
-                  label: AppLocalizations.of(context).email,
-                  value: _email,
-                  locked: true,
-                ),
-                _divider(),
-                _InfoTile(
-                  icon: Icons.phone_android,
-                  label: AppLocalizations.of(context).phone,
-                  ctrl: _phoneCtrl,
-                  editable: _editing,
-                  keyboard: TextInputType.phone,
-                ),
-                if (_memberCode.isNotEmpty) ...[
+              _Card(
+                title: AppLocalizations.of(context).personalInfo,
+                icon: Icons.person_outline,
+                child: Column(children: [
+                  _InfoTile(
+                    icon: Icons.badge_outlined,
+                    label: AppLocalizations.of(context).fullName,
+                    ctrl: _nameCtrl,
+                    editable: _editing,
+                  ),
                   _divider(),
                   _ReadTile(
-                    icon: Icons.confirmation_number_outlined,
-                    label: AppLocalizations.of(context).memberCode,
-                    value: _memberCode,
+                    icon: Icons.email_outlined,
+                    label: AppLocalizations.of(context).email,
+                    value: _email,
                     locked: true,
-                    badge: true,
                   ),
-                ],
-              ]),
-            ),
-            const SizedBox(height: 16),
-
-            _Card(
-              title: AppLocalizations.of(context).myAccount,
-              icon: Icons.dashboard_outlined,
-              child: Builder(builder: (ctx) {
-                final t = AppLocalizations.of(ctx);
-                return Column(children: [
-                  _Shortcut(
-                      icon: Icons.settings_outlined,
-                      color: Colors.orange,
-                      label: t.settingsSecurity,
-                      onTap: () => Navigator.pushNamed(ctx, '/settings')),
                   _divider(),
-                  _Shortcut(
-                      icon: Icons.notifications_outlined,
-                      color: Colors.blue,
-                      label: t.notifications,
-                      onTap: () =>
-                          Navigator.pushNamed(ctx, '/notifications')),
-                  _divider(),
-                  _Shortcut(
-                      icon: Icons.receipt_long_outlined,
-                      color: Colors.green,
-                      label: t.orderHistory,
-                      onTap: () => Navigator.push(
-                          ctx,
-                          MaterialPageRoute(
-                              builder: (_) => const OrderHistoryPage()))),
-                  _divider(),
-                  _LoyaltyShortcut(
-                      uid: FirebaseAuth.instance.currentUser?.uid ?? ''),
-                ]);
-              }),
-            ),
-            const SizedBox(height: 24),
+                  _InfoTile(
+                    icon: Icons.phone_android,
+                    label: AppLocalizations.of(context).phone,
+                    ctrl: _phoneCtrl,
+                    editable: _editing,
+                    keyboard: TextInputType.phone,
+                  ),
+                  if (_memberCode.isNotEmpty) ...[
+                    _divider(),
+                    _ReadTile(
+                      icon: Icons.confirmation_number_outlined,
+                      label: AppLocalizations.of(context).memberCode,
+                      value: _memberCode,
+                      locked: true,
+                      badge: true,
+                    ),
+                  ],
+                ]),
+              ),
+              const SizedBox(height: 16),
 
-            ElevatedButton.icon(
-              onPressed: _saving
-                  ? null
-                  : () {
-                      if (_editing)
-                        _saveProfile();
-                      else
-                        setState(() => _editing = true);
-                    },
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: _editing ? Colors.green : Colors.orange,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 52),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(26))),
-              icon: _saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2))
-                  : Icon(_editing ? Icons.save_outlined : Icons.edit_outlined),
-              label: Builder(builder: (ctx) {
-                final t = AppLocalizations.of(ctx);
-                return Text(
-                    _saving ? t.saving : _editing ? t.save : t.changeMyProfile,
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.bold));
-              }),
-            ),
+              _Card(
+                title: AppLocalizations.of(context).myAccount,
+                icon: Icons.dashboard_outlined,
+                child: Builder(builder: (ctx) {
+                  final t = AppLocalizations.of(ctx);
+                  return Column(children: [
+                    _Shortcut(
+                        icon: Icons.settings_outlined,
+                        color: Colors.orange,
+                        label: t.settingsSecurity,
+                        onTap: () => Navigator.pushNamed(ctx, '/settings')),
+                    _divider(),
+                    _Shortcut(
+                        icon: Icons.notifications_outlined,
+                        color: Colors.blue,
+                        label: t.notifications,
+                        onTap: () =>
+                            Navigator.pushNamed(ctx, '/notifications')),
+                    _divider(),
+                    _Shortcut(
+                        icon: Icons.receipt_long_outlined,
+                        color: Colors.green,
+                        label: t.orderHistory,
+                        onTap: () => Navigator.push(
+                            ctx,
+                            MaterialPageRoute(
+                                builder: (_) => const OrderHistoryPage()))),
+                    _divider(),
+                    _LoyaltyShortcut(
+                        uid: FirebaseAuth.instance.currentUser?.uid ?? ''),
+                  ]);
+                }),
+              ),
+              const SizedBox(height: 24),
 
-            if (_editing) ...[
-              const SizedBox(height: 10),
-              OutlinedButton(
-                onPressed: () {
-                  setState(() => _editing = false);
-                  _loadProfile();
-                },
-                style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.grey,
-                    side: const BorderSide(color: Colors.grey),
-                    minimumSize: const Size(double.infinity, 48),
+              ElevatedButton.icon(
+                onPressed: _saving
+                    ? null
+                    : () {
+                        if (_editing)
+                          _saveProfile();
+                        else
+                          setState(() => _editing = true);
+                      },
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: _editing ? Colors.green : Colors.orange,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 52),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(26))),
-                child: Text(AppLocalizations.of(context).cancel),
+                icon: _saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
+                    : Icon(
+                        _editing ? Icons.save_outlined : Icons.edit_outlined),
+                label: Builder(builder: (ctx) {
+                  final t = AppLocalizations.of(ctx);
+                  return Text(
+                      _saving
+                          ? t.saving
+                          : _editing
+                              ? t.save
+                              : t.changeMyProfile,
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.bold));
+                }),
+              ),
+
+              if (_editing) ...[
+                const SizedBox(height: 10),
+                OutlinedButton(
+                  onPressed: () {
+                    setState(() => _editing = false);
+                    _loadProfile();
+                  },
+                  style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.grey,
+                      side: const BorderSide(color: Colors.grey),
+                      minimumSize: const Size(double.infinity, 48),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(26))),
+                  child: Text(AppLocalizations.of(context).cancel),
+                ),
+              ],
+
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _logout,
+                style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(26))),
+                icon: const Icon(Icons.logout),
+                label: Text(AppLocalizations.of(context).logout,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600)),
               ),
             ],
-
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _logout,
-              style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Colors.red),
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(26))),
-              icon: const Icon(Icons.logout),
-              label: Text(AppLocalizations.of(context).logout,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -499,7 +518,10 @@ class _ProfilPageState extends State<ProfilPage> {
         Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_nameCtrl.text.isNotEmpty ? _nameCtrl.text : AppLocalizations.of(context).userFallback,
+          Text(
+              _nameCtrl.text.isNotEmpty
+                  ? _nameCtrl.text
+                  : AppLocalizations.of(context).userFallback,
               style: const TextStyle(
                   color: Colors.black87,
                   fontSize: 17,
@@ -515,8 +537,7 @@ class _ProfilPageState extends State<ProfilPage> {
               const Icon(Icons.phone, color: Colors.black54, size: 12),
               const SizedBox(width: 4),
               Text(_phoneCtrl.text,
-                  style: const TextStyle(
-                      color: Colors.black54, fontSize: 12)),
+                  style: const TextStyle(color: Colors.black54, fontSize: 12)),
             ]),
           ],
           if (_memberCode.isNotEmpty) ...[
@@ -642,8 +663,7 @@ class _InfoTile extends StatelessWidget {
                         style: const TextStyle(
                             fontSize: 14, fontWeight: FontWeight.w500)),
               ])),
-          if (editable)
-            const Icon(Icons.edit, size: 13, color: Colors.black54),
+          if (editable) const Icon(Icons.edit, size: 13, color: Colors.black54),
         ]),
       );
 }
@@ -774,14 +794,14 @@ class _LoyaltyShortcut extends StatelessWidget {
                       Text(AppLocalizations.of(context).loyaltyProgram,
                           style: const TextStyle(
                               fontSize: 14, fontWeight: FontWeight.w500)),
-                      Text(AppLocalizations.of(context).pointsAccumulated(points),
+                      Text(
+                          AppLocalizations.of(context)
+                              .pointsAccumulated(points),
                           style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade500)),
+                              fontSize: 11, color: Colors.grey.shade500)),
                     ]),
               ),
-              Icon(Icons.chevron_right,
-                  color: Colors.grey.shade400, size: 19),
+              Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 19),
             ]),
           ),
         );

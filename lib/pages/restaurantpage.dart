@@ -1,4 +1,4 @@
-﻿// lib/pages/restaurantpage.dart
+// lib/pages/restaurantpage.dart
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -135,13 +135,20 @@ class _RestaurantPageState extends State<RestaurantPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
-    final searchBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-    final fieldFill = isDark ? AppColors.fieldFillDark : AppColors.fieldFillLight;
+    final fieldFill =
+        isDark ? AppColors.fieldFillDark : AppColors.fieldFillLight;
 
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
         title: Text(widget.sectionTitle ?? 'Restaurants'),
+        titleTextStyle: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          color: isDark ? Colors.white : Colors.black87,
+        ),
+        centerTitle: false,
+        titleSpacing: 20,
         backgroundColor: bg,
         foregroundColor: isDark ? Colors.white : Colors.black87,
         elevation: 0,
@@ -150,7 +157,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
       body: Column(children: [
         // Barre de recherche
         Container(
-          color: searchBg,
+          color: bg,
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
           child: Column(children: [
             TextField(
@@ -250,7 +257,9 @@ class _RestaurantPageState extends State<RestaurantPage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                      color: isDark ? AppColors.fieldFillDark : AppColors.fieldFillLight,
+                      color: isDark
+                          ? AppColors.fieldFillDark
+                          : AppColors.fieldFillLight,
                       borderRadius: BorderRadius.circular(20)),
                   child: const Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon(Icons.tune_rounded, color: AppColors.accent, size: 15),
@@ -282,7 +291,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
                           crossAxisCount: 2,
                           crossAxisSpacing: 10,
                           mainAxisSpacing: 10,
-                          childAspectRatio: 0.68,
+                          childAspectRatio: 0.62,
                         ),
                         itemCount: _results.length,
                         itemBuilder: (_, i) =>
@@ -309,13 +318,14 @@ class _ShimmerGrid extends StatelessWidget {
           crossAxisCount: 2,
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
-          childAspectRatio: 0.68,
+          childAspectRatio: 0.62,
         ),
         itemCount: 6,
         itemBuilder: (_, __) => Container(
           decoration: BoxDecoration(
               color: Colors.white, borderRadius: BorderRadius.circular(18)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Container(
                 height: 115,
                 decoration: const BoxDecoration(
@@ -398,20 +408,24 @@ class _RestaurantCard extends StatelessWidget {
                       color: Colors.black.withValues(alpha: 0.45),
                       alignment: Alignment.center,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                            color: AppColors.error, borderRadius: BorderRadius.circular(20)),
+                            color: AppColors.error,
+                            borderRadius: BorderRadius.circular(20)),
                         child: const Text('Fermé',
                             style: TextStyle(
-                                color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold)),
                       ),
                     ),
                   Positioned(
                       top: 8,
                       left: 8,
                       child: _Badge(
-                          icon: Icons.delivery_dining,
-                          label: '${restaurant.deliveryTime} min',
+                          icon: Icons.access_time_rounded,
+                          label: '${restaurant.deliveryTime}mn',
                           color: Colors.black54)),
                   Positioned(
                       top: 8,
@@ -424,11 +438,12 @@ class _RestaurantCard extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.all(5),
                           decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.35),
-                              shape: BoxShape.circle),
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.grey.shade300)),
                           child: Icon(
                             isFav ? Icons.favorite : Icons.favorite_border,
-                            color: isFav ? Colors.red : Colors.white,
+                            color: isFav ? Colors.red : Colors.grey.shade600,
                             size: 14,
                           ),
                         ),
@@ -446,23 +461,17 @@ class _RestaurantCard extends StatelessWidget {
                           style: const TextStyle(
                               fontSize: 13, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 3),
-                      Row(children: [
-                        Expanded(
-                          child: Text(restaurant.style,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                  color: Colors.orange.shade600,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500)),
-                        ),
-                        if (restaurant.rating > 0) ...[
-                          const Icon(Icons.star_rounded, size: 13, color: Color(0xFFFFB020)),
-                          const SizedBox(width: 1),
-                          Text(restaurant.rating.toStringAsFixed(1),
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        ],
-                      ]),
+                      Text(restaurant.style,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: Colors.orange.shade600,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500)),
+                      if (restaurant.rating > 0) ...[
+                        const SizedBox(height: 3),
+                        _StarRow(rating: restaurant.rating),
+                      ],
                       const SizedBox(height: 4),
                       Row(children: [
                         const Icon(Icons.location_on_outlined,
@@ -490,8 +499,7 @@ class _RestaurantCard extends StatelessWidget {
                           style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.orange,
                               foregroundColor: Colors.white,
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 8),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
                               minimumSize: Size.zero,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               elevation: 0,
@@ -626,6 +634,30 @@ class _PhotoCarouselState extends State<_PhotoCarousel> {
         ),
       ]),
     );
+  }
+}
+
+// Rangée de 5 étoiles (pleine / vide) + note chiffrée
+class _StarRow extends StatelessWidget {
+  final double rating;
+  const _StarRow({required this.rating});
+
+  @override
+  Widget build(BuildContext context) {
+    final rounded = rating.round().clamp(0, 5);
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      ...List.generate(
+        5,
+        (i) => Icon(
+          i < rounded ? Icons.star_rounded : Icons.star_outline_rounded,
+          size: 12,
+          color: const Color(0xFFFFB020),
+        ),
+      ),
+      const SizedBox(width: 4),
+      Text(rating.toStringAsFixed(1),
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+    ]);
   }
 }
 

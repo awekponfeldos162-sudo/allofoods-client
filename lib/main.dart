@@ -1,5 +1,6 @@
 // lib/main.dart — allofoods + FCM intégré
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_application_2/favorites_provider.dart';
@@ -29,10 +30,10 @@ import 'pages/NotificationsPage.dart';
 import 'pages/SettingsScreen.dart';
 import 'pages/TrackingPage.dart';
 import 'services/biometric_service.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'pages/WaitingPage.dart';
 import 'pages/restaurant_detail_page.dart';
 import 'models/restaurant_model.dart';
-import 'widgets/allofoods_app_bar.dart';
 import 'services/fcm_service.dart';
 import 'services/local_notification_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -42,6 +43,7 @@ import 'package:google_maps_flutter_android/google_maps_flutter_android.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'theme/app_theme.dart';
+
 final _appNavKey = GlobalKey<NavigatorState>();
 
 // Handler FCM background — DOIT être top-level, exécuté quand app est fermée/arrière-plan
@@ -128,18 +130,29 @@ void main() async {
     dotenv.load(fileName: '.env'),
   ]);
 
+  // Crashlytics — désactivé en debug (bruit des hot-reloads/erreurs de dev),
+  // actif en release pour avoir une vraie visibilité sur les crashs terrain.
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+  WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
+
   // Supabase en arrière-plan — réseau, non nécessaire au premier affichage
   // (utilisé uniquement pour l'upload de photos, après que l'app est déjà visible)
   () async {
     try {
-      await Supabase.initialize(url: Env.supabaseUrl, anonKey: Env.supabaseAnonKey);
+      await Supabase.initialize(
+          url: Env.supabaseUrl, anonKey: Env.supabaseAnonKey);
     } catch (e) {
       debugPrint('[Supabase] init: $e');
     }
   }();
 
   // Synchrone — pas de réseau
-  FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: true);
+  FirebaseFirestore.instance.settings =
+      const Settings(persistenceEnabled: true);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   // Canal notifications en arrière-plan — non nécessaire avant le 1er message
@@ -217,7 +230,8 @@ class _SplashScreen extends StatelessWidget {
     final brightness = Theme.of(context).brightness;
     final isDark = brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+      backgroundColor:
+          isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -228,12 +242,14 @@ class _SplashScreen extends StatelessWidget {
                 color: AppColors.accent.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.fastfood_rounded, color: AppColors.accent, size: 56),
+              child: const Icon(Icons.fastfood_rounded,
+                  color: AppColors.accent, size: 56),
             )
                 .animate(onPlay: (c) => c.repeat(reverse: true))
                 .scaleXY(end: 1.08, duration: 900.ms, curve: Curves.easeInOut),
             const SizedBox(height: AppSpacing.lg),
-            Text('allofoods', style: AppTextStyles.textTheme(brightness).displaySmall)
+            Text('allofoods',
+                    style: AppTextStyles.textTheme(brightness).displaySmall)
                 .animate()
                 .fadeIn(duration: 400.ms)
                 .slideY(begin: 0.15, end: 0),
@@ -246,7 +262,8 @@ class _SplashScreen extends StatelessWidget {
                   child: Container(
                     width: 8,
                     height: 8,
-                    decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
+                    decoration: const BoxDecoration(
+                        color: AppColors.accent, shape: BoxShape.circle),
                   )
                       .animate(onPlay: (c) => c.repeat())
                       .fadeIn(duration: 400.ms, delay: (i * 150).ms)
@@ -291,8 +308,7 @@ class _AuthGateState extends State<AuthGate> {
               if (userSnap.connectionState == ConnectionState.waiting) {
                 return const _SplashScreen();
               }
-              final data =
-                  userSnap.data?.data() as Map<String, dynamic>?;
+              final data = userSnap.data?.data() as Map<String, dynamic>?;
               if (data == null || data['termsAccepted'] != true) {
                 return TermsAcceptancePage(uid: user.uid);
               }
@@ -501,11 +517,7 @@ class _MainScaffoldState extends State<MainScaffold> {
       if (terminalStatuses.contains(status) || status.isEmpty) return;
 
       // Commandes payées en attente de préparation/livraison ? WaitingPage
-      const waitingStatuses = [
-        'paid',
-        'preparing',
-        'ready_for_pickup'
-      ];
+      const waitingStatuses = ['paid', 'preparing', 'ready_for_pickup'];
       if (waitingStatuses.contains(status)) {
         Navigator.push(
           context,
@@ -690,24 +702,28 @@ class _MainScaffoldState extends State<MainScaffold> {
 
       const waitingStatuses = {'paid', 'preparing', 'ready_for_pickup'};
       if (waitingStatuses.contains(status)) {
-        Navigator.push(context, MaterialPageRoute(
-          builder: (_) => WaitingPage(
-            orderId: orderId,
-            totalAmount: amount,
-            restaurantName: restName,
-          ),
-        ));
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => WaitingPage(
+                orderId: orderId,
+                totalAmount: amount,
+                restaurantName: restName,
+              ),
+            ));
       } else if (status.isNotEmpty &&
           status != 'delivered' &&
           status != 'cancelled' &&
           status != 'cancelled_by_restaurant') {
-        Navigator.push(context, MaterialPageRoute(
-          builder: (_) => TrackingPage(
-            orderId: orderId,
-            orderAmount: amount,
-            restaurantName: restName,
-          ),
-        ));
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => TrackingPage(
+                orderId: orderId,
+                orderAmount: amount,
+                restaurantName: restName,
+              ),
+            ));
       } else {
         // Commande terminée → historique notifications
         Navigator.pushNamed(context, '/notifications');
@@ -732,9 +748,11 @@ class _MainScaffoldState extends State<MainScaffold> {
       }
       final data = <String, dynamic>{...doc.data()!, 'id': doc.id};
       final restaurant = Restaurant.fromJson(data);
-      Navigator.push(context, MaterialPageRoute(
-        builder: (_) => RestaurantDetailPage(restaurant: restaurant),
-      ));
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RestaurantDetailPage(restaurant: restaurant),
+          ));
     } catch (e) {
       debugPrint('[NotifTap] erreur navigation restaurant: $e');
       if (mounted) _goToPage(1);
@@ -745,11 +763,10 @@ class _MainScaffoldState extends State<MainScaffold> {
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final t = AppLocalizations.of(context);
-    final titles = ['allofoods', t.restaurants, t.cart, t.address, t.profile];
     return Scaffold(
-      // Onglet Accueil : en-tête intégrée à Homepage (salutation + cloche +
-      // avatar) — la barre allofoodsAppBar ferait doublon.
-      appBar: _index == 0 ? null : allofoodsAppBar(title: titles[_index]),
+      // Chaque onglet gère sa propre en-tête (titre + SafeArea) — plus de
+      // barre "allofoods" globale avec cloche, qui faisait doublon.
+      appBar: null,
       body: PageView(
         controller: _pageCtrl,
         physics: const ClampingScrollPhysics(),
@@ -899,7 +916,8 @@ class MobileWebWrapper extends StatelessWidget {
                         fontFamily: 'Poppins')),
                 Text('Cotonou, Bénin',
                     style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 11)),
               ]),
             ]),
           ),
@@ -914,7 +932,8 @@ class MobileWebWrapper extends StatelessWidget {
                 decoration: BoxDecoration(
                     color: Colors.transparent,
                     border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.12), width: 1.5)),
+                        color: Colors.white.withValues(alpha: 0.12),
+                        width: 1.5)),
                 child:
                     Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   Container(
@@ -965,7 +984,8 @@ class MobileWebWrapper extends StatelessWidget {
                 decoration: BoxDecoration(
                     color: Colors.transparent,
                     border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.12), width: 1.5)),
+                        color: Colors.white.withValues(alpha: 0.12),
+                        width: 1.5)),
                 child: Center(
                     child: Container(
                         width: 110,
@@ -1015,11 +1035,7 @@ class _ActiveOrderFABState extends State<_ActiveOrderFAB>
     with SingleTickerProviderStateMixin {
   late final AnimationController _pulse;
 
-  static const _waitingStatuses = {
-    'paid',
-    'preparing',
-    'ready_for_pickup'
-  };
+  static const _waitingStatuses = {'paid', 'preparing', 'ready_for_pickup'};
 
   @override
   void initState() {

@@ -56,16 +56,15 @@ class _PanierPageState extends State<PanierPage>
     return Material(
       color: Theme.of(context).scaffoldBackgroundColor,
       child: SafeArea(
-        // Seulement quand pushée : le Scaffold du tab gére déjà la status bar
-        top: isPushed,
+        top: true,
         bottom: false,
         child: Column(children: [
-          // Header retour — visible seulement quand pushée
-          if (isPushed)
-            Container(
-              color: barColor,
-              padding: const EdgeInsets.fromLTRB(4, 6, 16, 0),
-              child: Row(children: [
+          // En-tête — flèche retour seulement quand la page est pushée
+          Container(
+            color: barColor,
+            padding: EdgeInsets.fromLTRB(isPushed ? 4 : 20, 10, 16, 0),
+            child: Row(children: [
+              if (isPushed)
                 IconButton(
                   icon: Icon(
                     Icons.arrow_back_ios_new_rounded,
@@ -75,17 +74,18 @@ class _PanierPageState extends State<PanierPage>
                   onPressed: () => Navigator.of(context).maybePop(),
                   tooltip: 'Retour',
                 ),
-                const SizedBox(width: 2),
-                Text(
-                  AppLocalizations.of(context).myCart,
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
+              if (isPushed) const SizedBox(width: 2),
+              Text(
+                AppLocalizations.of(context).myCart,
+                style: TextStyle(
+                  fontSize: isPushed ? 17 : 24,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
                 ),
-              ]),
-            ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 4),
 
           // TabBar
           Container(
@@ -170,10 +170,11 @@ class _CartTab extends StatelessWidget {
                     child: ListView.builder(
                       padding: const EdgeInsets.fromLTRB(15, 15, 15, 0),
                       itemCount: cart.items.length,
-                      itemBuilder: (ctx, i) => _CartItemCard(index: i, item: cart.items[i])
-                          .animate()
-                          .fadeIn(duration: 250.ms, delay: (i * 40).ms)
-                          .slideX(begin: 0.05, end: 0),
+                      itemBuilder: (ctx, i) =>
+                          _CartItemCard(index: i, item: cart.items[i])
+                              .animate()
+                              .fadeIn(duration: 250.ms, delay: (i * 40).ms)
+                              .slideX(begin: 0.05, end: 0),
                     ),
                   ),
                   ConstrainedBox(
@@ -181,7 +182,11 @@ class _CartTab extends StatelessWidget {
                       maxHeight: MediaQuery.of(context).size.height * 0.55,
                     ),
                     child: _Summary(cart: cart),
-                  ).animate().slideY(begin: 0.15, end: 0, duration: 350.ms, curve: Curves.easeOutCubic),
+                  ).animate().slideY(
+                      begin: 0.15,
+                      end: 0,
+                      duration: 350.ms,
+                      curve: Curves.easeOutCubic),
                 ]),
         );
       },
@@ -205,11 +210,15 @@ class _FavoritesTab extends StatelessWidget {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Container(
                 padding: const EdgeInsets.all(AppSpacing.lg),
-                decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.08), shape: BoxShape.circle),
-                child: const Icon(Icons.favorite_outline_rounded, size: 52, color: AppColors.error),
+                decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.08),
+                    shape: BoxShape.circle),
+                child: const Icon(Icons.favorite_outline_rounded,
+                    size: 52, color: AppColors.error),
               ),
               const SizedBox(height: AppSpacing.lg),
-              Text(AppLocalizations.of(context).noFavorites, style: texts.headlineSmall),
+              Text(AppLocalizations.of(context).noFavorites,
+                  style: texts.headlineSmall),
               const SizedBox(height: AppSpacing.xs),
               Text(AppLocalizations.of(context).addFavoritesHint,
                   textAlign: TextAlign.center, style: texts.bodyMedium),
@@ -239,7 +248,10 @@ class _FavoritesTab extends StatelessWidget {
               itemBuilder: (_, i) => _FavCard(
                 restaurant: restaurants[i],
                 onRemove: () => favs.toggleRestaurant(restaurants[i].id),
-              ).animate().fadeIn(duration: 250.ms, delay: (i * 40).ms).slideX(begin: 0.05, end: 0),
+              )
+                  .animate()
+                  .fadeIn(duration: 250.ms, delay: (i * 40).ms)
+                  .slideX(begin: 0.05, end: 0),
             );
           },
         );
@@ -279,30 +291,41 @@ class _FavCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: PremiumCard(
         padding: EdgeInsets.zero,
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => RestaurantProfilePage(restaurant: restaurant))),
+        onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => RestaurantProfilePage(restaurant: restaurant))),
         child: Row(children: [
           ClipRRect(
-            borderRadius: const BorderRadius.horizontal(left: Radius.circular(AppRadius.card)),
+            borderRadius: const BorderRadius.horizontal(
+                left: Radius.circular(AppRadius.card)),
             child: _Img(img: restaurant.coverImg, width: 90, height: 90),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(restaurant.name, style: texts.titleMedium),
-                const SizedBox(height: 2),
-                Text(restaurant.style, style: const TextStyle(color: AppColors.accent, fontSize: 12)),
-                const SizedBox(height: 6),
-                Row(children: [
-                  const Icon(Icons.star_rounded, size: 14, color: Color(0xFFFFB020)),
-                  Text(' ${restaurant.rating.toStringAsFixed(1)}', style: texts.labelSmall),
-                  const SizedBox(width: 10),
-                  Icon(Icons.timer_rounded, size: 13, color: texts.bodySmall?.color),
-                  Text(' ${restaurant.deliveryTime} min', style: texts.bodySmall),
-                ]),
-              ]),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(restaurant.name, style: texts.titleMedium),
+                    const SizedBox(height: 2),
+                    Text(restaurant.style,
+                        style: const TextStyle(
+                            color: AppColors.accent, fontSize: 12)),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      const Icon(Icons.star_rounded,
+                          size: 14, color: Color(0xFFFFB020)),
+                      Text(' ${restaurant.rating.toStringAsFixed(1)}',
+                          style: texts.labelSmall),
+                      const SizedBox(width: 10),
+                      Icon(Icons.timer_rounded,
+                          size: 13, color: texts.bodySmall?.color),
+                      Text(' ${restaurant.deliveryTime} min',
+                          style: texts.bodySmall),
+                    ]),
+                  ]),
             ),
           ),
           GestureDetector(
@@ -312,7 +335,8 @@ class _FavCard extends StatelessWidget {
             },
             child: const Padding(
               padding: EdgeInsets.only(right: 14),
-              child: Icon(Icons.favorite_rounded, color: AppColors.error, size: 22),
+              child: Icon(Icons.favorite_rounded,
+                  color: AppColors.error, size: 22),
             ),
           ),
         ]),
@@ -334,20 +358,24 @@ void _retryOrderFromHistory(BuildContext context, Map<String, dynamic> data) {
     final restaurantId = _strH(data['restaurantId']);
     final restaurantName = _strH(data['restaurantName']);
     final rawItems = (data['items'] as List?)?.whereType<Map>().toList() ?? [];
-    final items = rawItems.map((item) => CartItem(
-          name: _strH(item['name']),
-          price: _strH(item['price']).isNotEmpty ? _strH(item['price']) : '0',
-          img: _strH(item['img']),
-          restaurantName: _strH(item['restaurantName']).isNotEmpty
-              ? _strH(item['restaurantName'])
-              : restaurantName,
-          restaurantId: restaurantId,
-          quantity: (item['quantity'] as num?)?.toInt() ?? 1,
-        )).toList();
+    final items = rawItems
+        .map((item) => CartItem(
+              name: _strH(item['name']),
+              price:
+                  _strH(item['price']).isNotEmpty ? _strH(item['price']) : '0',
+              img: _strH(item['img']),
+              restaurantName: _strH(item['restaurantName']).isNotEmpty
+                  ? _strH(item['restaurantName'])
+                  : restaurantName,
+              restaurantId: restaurantId,
+              quantity: (item['quantity'] as num?)?.toInt() ?? 1,
+            ))
+        .toList();
 
     if (items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Impossible de retrouver les articles de cette commande.'),
+        content:
+            Text('Impossible de retrouver les articles de cette commande.'),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
       ));
@@ -455,7 +483,8 @@ class _HistoryTabState extends State<_HistoryTab> {
                 children: [
                   const Icon(Icons.check_circle_outline, size: 14),
                   const SizedBox(width: 4),
-                  Text(AppLocalizations.of(context).deliveredTab, style: const TextStyle(fontSize: 13)),
+                  Text(AppLocalizations.of(context).deliveredTab,
+                      style: const TextStyle(fontSize: 13)),
                 ],
               ),
             ),
@@ -466,7 +495,8 @@ class _HistoryTabState extends State<_HistoryTab> {
                 children: [
                   const Icon(Icons.replay_outlined, size: 14),
                   const SizedBox(width: 4),
-                  Text(AppLocalizations.of(context).failedTab, style: const TextStyle(fontSize: 13)),
+                  Text(AppLocalizations.of(context).failedTab,
+                      style: const TextStyle(fontSize: 13)),
                 ],
               ),
             ),
@@ -565,24 +595,26 @@ class _HistoryDeliveredTab extends StatelessWidget {
                             color: AppColors.error,
                             borderRadius: AppRadius.cardRadius,
                           ),
-                          child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.delete_outline,
-                                    color: Colors.white, size: 26),
-                                const SizedBox(height: 4),
-                                Text(AppLocalizations.of(context).deleteLabel,
-                                    style: const TextStyle(
-                                        color: Colors.white, fontSize: 11)),
-                              ]),
+                          child:
+                              Column(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.delete_outline,
+                                color: Colors.white, size: 26),
+                            const SizedBox(height: 4),
+                            Text(AppLocalizations.of(context).deleteLabel,
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 11)),
+                          ]),
                         ),
                         onDismissed: (_) => onDelete(doc.id),
                         child: _HisOrderCard(
                           data: data,
-                          onTap: () => _showDeliveredDetail(
-                              context, data, doc.id),
+                          onTap: () =>
+                              _showDeliveredDetail(context, data, doc.id),
                           onDelete: () => onDelete(doc.id),
-                        ).animate().fadeIn(duration: 250.ms).slideX(begin: 0.04, end: 0),
+                        )
+                            .animate()
+                            .fadeIn(duration: 250.ms)
+                            .slideX(begin: 0.04, end: 0),
                       );
                     }),
                     const SizedBox(height: 8),
@@ -604,8 +636,7 @@ class _HistoryDeliveredTab extends StatelessWidget {
       useSafeArea: true,
       constraints:
           BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
-      builder: (_) =>
-          _HisOrderDetailSheet(data: data, orderId: orderId),
+      builder: (_) => _HisOrderDetailSheet(data: data, orderId: orderId),
     );
   }
 }
@@ -643,8 +674,12 @@ class _HistoryCancelledTab extends StatelessWidget {
               final data = entry.value.data() as Map<String, dynamic>;
               return _HisCancelledCard(
                 data: data,
-                onTap: () => _showCancelledDetail(context, data, entry.value.id),
-              ).animate().fadeIn(duration: 250.ms, delay: (entry.key * 40).ms).slideX(begin: 0.04, end: 0);
+                onTap: () =>
+                    _showCancelledDetail(context, data, entry.value.id),
+              )
+                  .animate()
+                  .fadeIn(duration: 250.ms, delay: (entry.key * 40).ms)
+                  .slideX(begin: 0.04, end: 0);
             }),
             const SizedBox(height: 16),
           ],
@@ -692,13 +727,18 @@ class _HisSummaryBar extends StatelessWidget {
       child: Row(children: [
         Container(
           padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), shape: BoxShape.circle),
-          child: const Icon(Icons.check_circle_outline_rounded, color: AppColors.success, size: 20),
+          decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.1),
+              shape: BoxShape.circle),
+          child: const Icon(Icons.check_circle_outline_rounded,
+              color: AppColors.success, size: 20),
         ),
         const SizedBox(width: 12),
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(AppLocalizations.of(context).deliveriesCount(total), style: texts.titleMedium),
-          Text(AppLocalizations.of(context).deliveredOrdersOnly, style: texts.labelSmall),
+          Text(AppLocalizations.of(context).deliveriesCount(total),
+              style: texts.titleMedium),
+          Text(AppLocalizations.of(context).deliveredOrdersOnly,
+              style: texts.labelSmall),
         ]),
       ]),
     );
@@ -732,8 +772,7 @@ class _HisOrderCard extends StatelessWidget {
     final items = (data['items'] as List?)?.cast<Map>() ?? [];
     final ts = data['createdAt'] as Timestamp?;
     final totalAmount = _hNum(data['totalAmount']);
-    final delivPayCash =
-        (data['delivery_payment_method'] as String?) == 'cash';
+    final delivPayCash = (data['delivery_payment_method'] as String?) == 'cash';
     final appAmount =
         delivPayCash ? totalAmount - _hNum(data['deliveryFee']) : totalAmount;
 
@@ -743,36 +782,54 @@ class _HisOrderCard extends StatelessWidget {
         onLongPress: onDelete,
         child: PremiumCard(
           onTap: onTap,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration:
-                    BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
-                child: const Icon(Icons.restaurant_rounded, color: AppColors.accent, size: 18),
+                decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.restaurant_rounded,
+                    color: AppColors.accent, size: 18),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(_hStr(data['restaurantName']), style: texts.titleSmall, overflow: TextOverflow.ellipsis),
-                  Text(ts != null ? _hDate(ts) : '—', style: texts.labelSmall),
-                ]),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_hStr(data['restaurantName']),
+                          style: texts.titleSmall,
+                          overflow: TextOverflow.ellipsis),
+                      Text(ts != null ? _hDate(ts) : '—',
+                          style: texts.labelSmall),
+                    ]),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: AppRadius.chipRadius),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.1),
+                    borderRadius: AppRadius.chipRadius),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.check_circle_outline_rounded, color: AppColors.success, size: 12),
+                  const Icon(Icons.check_circle_outline_rounded,
+                      color: AppColors.success, size: 12),
                   const SizedBox(width: 4),
                   Text(AppLocalizations.of(context).deliveredBadge,
-                      style: const TextStyle(color: AppColors.success, fontSize: 11, fontWeight: FontWeight.bold)),
+                      style: const TextStyle(
+                          color: AppColors.success,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold)),
                 ]),
               ),
             ]),
             if (items.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
-                  items.take(3).map((i) => '${i['quantity']}× ${i['name']}').join(' • ') +
+                  items
+                          .take(3)
+                          .map((i) => '${i['quantity']}× ${i['name']}')
+                          .join(' • ') +
                       (items.length > 3 ? ' +${items.length - 3}' : ''),
                   style: texts.bodySmall,
                   maxLines: 1,
@@ -781,16 +838,19 @@ class _HisOrderCard extends StatelessWidget {
             const SizedBox(height: 8),
             Row(children: [
               Row(children: [
-                Icon(Icons.phone_android_rounded, size: 11, color: texts.bodySmall?.color),
+                Icon(Icons.phone_android_rounded,
+                    size: 11, color: texts.bodySmall?.color),
                 const SizedBox(width: 4),
                 Text('App : $appAmount FCFA', style: texts.labelMedium),
               ]),
               if (delivPayCash) ...[
                 const SizedBox(width: 10),
                 Row(children: [
-                  Icon(Icons.money_rounded, size: 11, color: texts.bodySmall?.color),
+                  Icon(Icons.money_rounded,
+                      size: 11, color: texts.bodySmall?.color),
                   const SizedBox(width: 4),
-                  Text('Cash : ${_hNum(data['deliveryFee'])} FCFA', style: texts.labelMedium),
+                  Text('Cash : ${_hNum(data['deliveryFee'])} FCFA',
+                      style: texts.labelMedium),
                 ]),
               ],
               const Spacer(),
@@ -806,8 +866,7 @@ class _HisOrderCard extends StatelessWidget {
 class _HisOrderDetailSheet extends StatelessWidget {
   final Map<String, dynamic> data;
   final String orderId;
-  const _HisOrderDetailSheet(
-      {required this.data, required this.orderId});
+  const _HisOrderDetailSheet({required this.data, required this.orderId});
 
   @override
   Widget build(BuildContext context) {
@@ -818,8 +877,7 @@ class _HisOrderDetailSheet extends StatelessWidget {
     final delivFee = _hNum(data['deliveryFee']);
     final serviceFee = _hNum(data['serviceFee']);
     final foodAmt = _hNum(data['foodAmount']);
-    final delivPayCash =
-        (data['delivery_payment_method'] as String?) == 'cash';
+    final delivPayCash = (data['delivery_payment_method'] as String?) == 'cash';
     final payment = _hStr(data['paymentMethod']);
     final shortId = orderId.length >= 8
         ? orderId.substring(0, 8).toUpperCase()
@@ -828,8 +886,11 @@ class _HisOrderDetailSheet extends StatelessWidget {
     return Container(
       height: double.infinity,
       decoration: BoxDecoration(
-          color: brightness == Brightness.dark ? AppColors.surfaceDark : AppColors.surfaceLight,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.card))),
+          color: brightness == Brightness.dark
+              ? AppColors.surfaceDark
+              : AppColors.surfaceLight,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadius.card))),
       padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom + 20),
       child: Column(children: [
@@ -838,7 +899,9 @@ class _HisOrderDetailSheet extends StatelessWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-                color: brightness == Brightness.dark ? AppColors.dividerDark : AppColors.dividerLight,
+                color: brightness == Brightness.dark
+                    ? AppColors.dividerDark
+                    : AppColors.dividerLight,
                 borderRadius: BorderRadius.circular(2))),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
@@ -847,15 +910,21 @@ class _HisOrderDetailSheet extends StatelessWidget {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_hStr(data['restaurantName']), style: texts.headlineSmall),
+                    Text(_hStr(data['restaurantName']),
+                        style: texts.headlineSmall),
                     Text('Commande #$shortId', style: texts.labelSmall),
                   ]),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: AppRadius.chipRadius),
+              decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.1),
+                  borderRadius: AppRadius.chipRadius),
               child: Text(AppLocalizations.of(context).statusDeliveredBadge,
-                  style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 12)),
+                  style: const TextStyle(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12)),
             ),
           ]),
         ),
@@ -863,10 +932,10 @@ class _HisOrderDetailSheet extends StatelessWidget {
         Flexible(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-              Text(AppLocalizations.of(context).itemsLabel, style: texts.titleSmall),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(AppLocalizations.of(context).itemsLabel,
+                  style: texts.titleSmall),
               const SizedBox(height: 8),
               ...items.map((item) => Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
@@ -874,23 +943,35 @@ class _HisOrderDetailSheet extends StatelessWidget {
                       Container(
                         width: 26,
                         height: 26,
-                        decoration:
-                            BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
+                        decoration: BoxDecoration(
+                            color: AppColors.accent.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8)),
                         child: Center(
                           child: Text('${item['quantity']}',
-                              style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 12)),
+                              style: const TextStyle(
+                                  color: AppColors.accent,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12)),
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Expanded(child: Text(_hStr(item['name']), style: texts.bodyMedium, overflow: TextOverflow.ellipsis)),
-                      Text('${_hNum(item['price']) * _hNum(item['quantity'])} FCFA', style: AppTextStyles.price(brightness, size: 13, weight: FontWeight.w500)),
+                      Expanded(
+                          child: Text(_hStr(item['name']),
+                              style: texts.bodyMedium,
+                              overflow: TextOverflow.ellipsis)),
+                      Text(
+                          '${_hNum(item['price']) * _hNum(item['quantity'])} FCFA',
+                          style: AppTextStyles.price(brightness,
+                              size: 13, weight: FontWeight.w500)),
                     ]),
                   )),
               const SizedBox(height: 14),
               const Divider(),
               const SizedBox(height: 8),
-              _DetailRow(AppLocalizations.of(context).dishesPriceLabel, '$foodAmt FCFA'),
-              _DetailRow(AppLocalizations.of(context).commissionLabel, '$serviceFee FCFA'),
+              _DetailRow(AppLocalizations.of(context).dishesPriceLabel,
+                  '$foodAmt FCFA'),
+              _DetailRow(AppLocalizations.of(context).commissionLabel,
+                  '$serviceFee FCFA'),
               _DetailRow(
                 delivPayCash
                     ? AppLocalizations.of(context).deliveryCash
@@ -898,21 +979,26 @@ class _HisOrderDetailSheet extends StatelessWidget {
                 '$delivFee FCFA',
               ),
               const Divider(height: 16),
-              _DetailRow(AppLocalizations.of(context).totalPaidApp, '$total FCFA', bold: true),
+              _DetailRow(
+                  AppLocalizations.of(context).totalPaidApp, '$total FCFA',
+                  bold: true),
               const SizedBox(height: 14),
-              Text(AppLocalizations.of(context).detailsLabel, style: texts.titleSmall),
+              Text(AppLocalizations.of(context).detailsLabel,
+                  style: texts.titleSmall),
               const SizedBox(height: 8),
-              _DetailRow(AppLocalizations.of(context).address, _hStr(data['deliveryAddress'])),
-              _DetailRow(AppLocalizations.of(context).paymentMethodLabel, _hPayLabel(context, payment)),
-              _DetailRow(AppLocalizations.of(context).dateLabel, _hDate(data['createdAt'])),
+              _DetailRow(AppLocalizations.of(context).address,
+                  _hStr(data['deliveryAddress'])),
+              _DetailRow(AppLocalizations.of(context).paymentMethodLabel,
+                  _hPayLabel(context, payment)),
+              _DetailRow(AppLocalizations.of(context).dateLabel,
+                  _hDate(data['createdAt'])),
               const SizedBox(height: 16),
               _HisReceiptActions(data: data, orderId: orderId),
               const SizedBox(height: 8),
               if (_hStr(data['restaurantId']).isNotEmpty)
                 _HisReviewButton(
                   restaurantId: _hStr(data['restaurantId']),
-                  restaurantName:
-                      _hStr(data['restaurantName']),
+                  restaurantName: _hStr(data['restaurantName']),
                   orderId: orderId,
                 ),
               const SizedBox(height: 8),
@@ -957,14 +1043,20 @@ class _HisCancelledSummaryBar extends StatelessWidget {
       child: Row(children: [
         Container(
           padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.1), shape: BoxShape.circle),
-          child: const Icon(Icons.replay_outlined, color: AppColors.error, size: 20),
+          decoration: BoxDecoration(
+              color: AppColors.error.withValues(alpha: 0.1),
+              shape: BoxShape.circle),
+          child: const Icon(Icons.replay_outlined,
+              color: AppColors.error, size: 20),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(AppLocalizations.of(context).failedOrdersCount(total), style: texts.titleMedium),
-            Text(AppLocalizations.of(context).tapToRetry, style: texts.labelSmall),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(AppLocalizations.of(context).failedOrdersCount(total),
+                style: texts.titleMedium),
+            Text(AppLocalizations.of(context).tapToRetry,
+                style: texts.labelSmall),
           ]),
         ),
       ]),
@@ -986,9 +1078,8 @@ class _HisCancelledCard extends StatelessWidget {
     final totalAmount = _hNum(data['totalAmount']);
     final paymentStatus = _hStr(data['paymentStatus']);
     final t = AppLocalizations.of(context);
-    final failedLabel = paymentStatus == 'PAYMENT_FAILED'
-        ? t.failedPaymentLabel
-        : t.cancelled;
+    final failedLabel =
+        paymentStatus == 'PAYMENT_FAILED' ? t.failedPaymentLabel : t.cancelled;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -999,34 +1090,54 @@ class _HisCancelledCard extends StatelessWidget {
         ),
         child: PremiumCard(
           onTap: onTap,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
-                child: const Icon(Icons.restaurant_rounded, color: AppColors.error, size: 18),
+                decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.restaurant_rounded,
+                    color: AppColors.error, size: 18),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(_hStr(data['restaurantName']), style: texts.titleSmall, overflow: TextOverflow.ellipsis),
-                  Text(ts != null ? _hDate(ts) : '—', style: texts.labelSmall),
-                ]),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_hStr(data['restaurantName']),
+                          style: texts.titleSmall,
+                          overflow: TextOverflow.ellipsis),
+                      Text(ts != null ? _hDate(ts) : '—',
+                          style: texts.labelSmall),
+                    ]),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.1), borderRadius: AppRadius.chipRadius),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: AppRadius.chipRadius),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.cancel_outlined, color: AppColors.error, size: 12),
+                  const Icon(Icons.cancel_outlined,
+                      color: AppColors.error, size: 12),
                   const SizedBox(width: 4),
-                  Text(failedLabel, style: const TextStyle(color: AppColors.error, fontSize: 11, fontWeight: FontWeight.bold)),
+                  Text(failedLabel,
+                      style: const TextStyle(
+                          color: AppColors.error,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold)),
                 ]),
               ),
             ]),
             if (items.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
-                items.take(3).map((i) => '${i['quantity']}× ${i['name']}').join(' • ') +
+                items
+                        .take(3)
+                        .map((i) => '${i['quantity']}× ${i['name']}')
+                        .join(' • ') +
                     (items.length > 3 ? ' +${items.length - 3}' : ''),
                 style: texts.bodySmall,
                 maxLines: 1,
@@ -1037,15 +1148,26 @@ class _HisCancelledCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('$totalAmount FCFA', style: const TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 14)),
+                Text('$totalAmount FCFA',
+                    style: const TextStyle(
+                        color: AppColors.error,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14)),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(color: AppColors.accent, borderRadius: AppRadius.chipRadius),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: AppRadius.chipRadius),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.replay_rounded, color: Colors.white, size: 13),
+                    const Icon(Icons.replay_rounded,
+                        color: Colors.white, size: 13),
                     const SizedBox(width: 4),
                     Text(AppLocalizations.of(context).retryLabel,
-                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold)),
                   ]),
                 ),
               ],
@@ -1086,8 +1208,11 @@ class _HisCancelledDetailSheet extends StatelessWidget {
     return Container(
       height: double.infinity,
       decoration: BoxDecoration(
-          color: brightness == Brightness.dark ? AppColors.surfaceDark : AppColors.surfaceLight,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.card))),
+          color: brightness == Brightness.dark
+              ? AppColors.surfaceDark
+              : AppColors.surfaceLight,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadius.card))),
       padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom + 20),
       child: Column(children: [
@@ -1096,7 +1221,9 @@ class _HisCancelledDetailSheet extends StatelessWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-                color: brightness == Brightness.dark ? AppColors.dividerDark : AppColors.dividerLight,
+                color: brightness == Brightness.dark
+                    ? AppColors.dividerDark
+                    : AppColors.dividerLight,
                 borderRadius: BorderRadius.circular(2))),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
@@ -1105,15 +1232,21 @@ class _HisCancelledDetailSheet extends StatelessWidget {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_hStr(data['restaurantName']), style: texts.headlineSmall),
+                    Text(_hStr(data['restaurantName']),
+                        style: texts.headlineSmall),
                     Text('Commande #$shortId', style: texts.labelSmall),
                   ]),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.1), borderRadius: AppRadius.chipRadius),
+              decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.1),
+                  borderRadius: AppRadius.chipRadius),
               child: Text(AppLocalizations.of(context).failedOrderBadge,
-                  style: const TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 12)),
+                  style: const TextStyle(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12)),
             ),
           ]),
         ),
@@ -1121,11 +1254,17 @@ class _HisCancelledDetailSheet extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
           child: Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12)),
             child: Row(children: [
-              const Icon(Icons.info_outline_rounded, color: AppColors.error, size: 15),
+              const Icon(Icons.info_outline_rounded,
+                  color: AppColors.error, size: 15),
               const SizedBox(width: 8),
-              Expanded(child: Text(failReason, style: const TextStyle(fontSize: 12, color: AppColors.error))),
+              Expanded(
+                  child: Text(failReason,
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.error))),
             ]),
           ),
         ),
@@ -1133,10 +1272,10 @@ class _HisCancelledDetailSheet extends StatelessWidget {
         Flexible(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-              Text(AppLocalizations.of(context).itemsLabel, style: texts.titleSmall),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(AppLocalizations.of(context).itemsLabel,
+                  style: texts.titleSmall),
               const SizedBox(height: 8),
               ...items.map((item) => Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1144,26 +1283,41 @@ class _HisCancelledDetailSheet extends StatelessWidget {
                       Container(
                         width: 26,
                         height: 26,
-                        decoration:
-                            BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
+                        decoration: BoxDecoration(
+                            color: AppColors.accent.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8)),
                         child: Center(
                           child: Text('${item['quantity']}',
-                              style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 12)),
+                              style: const TextStyle(
+                                  color: AppColors.accent,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12)),
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Expanded(child: Text(_hStr(item['name']), style: texts.bodyMedium, overflow: TextOverflow.ellipsis)),
-                      Text('${_hNum(item['price']) * _hNum(item['quantity'])} FCFA', style: AppTextStyles.price(brightness, size: 13, weight: FontWeight.w500)),
+                      Expanded(
+                          child: Text(_hStr(item['name']),
+                              style: texts.bodyMedium,
+                              overflow: TextOverflow.ellipsis)),
+                      Text(
+                          '${_hNum(item['price']) * _hNum(item['quantity'])} FCFA',
+                          style: AppTextStyles.price(brightness,
+                              size: 13, weight: FontWeight.w500)),
                     ]),
                   )),
               const SizedBox(height: 14),
               const Divider(),
-              _DetailRow(AppLocalizations.of(context).subtotalDishes, '${total - delivFee} FCFA'),
-              _DetailRow(AppLocalizations.of(context).deliveryLabel, '$delivFee FCFA'),
-              _DetailRow(AppLocalizations.of(context).total, '$total FCFA', bold: true),
+              _DetailRow(AppLocalizations.of(context).subtotalDishes,
+                  '${total - delivFee} FCFA'),
+              _DetailRow(
+                  AppLocalizations.of(context).deliveryLabel, '$delivFee FCFA'),
+              _DetailRow(AppLocalizations.of(context).total, '$total FCFA',
+                  bold: true),
               const SizedBox(height: 8),
-              _DetailRow(AppLocalizations.of(context).address, _hStr(data['deliveryAddress'])),
-              _DetailRow(AppLocalizations.of(context).dateLabel, _hDate(data['createdAt'])),
+              _DetailRow(AppLocalizations.of(context).address,
+                  _hStr(data['deliveryAddress'])),
+              _DetailRow(AppLocalizations.of(context).dateLabel,
+                  _hDate(data['createdAt'])),
               const SizedBox(height: 8),
             ]),
           ),
@@ -1192,13 +1346,18 @@ class _HisEmptyDelivered extends StatelessWidget {
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
           padding: const EdgeInsets.all(AppSpacing.lg),
-          decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), shape: BoxShape.circle),
-          child: const Icon(Icons.receipt_long_outlined, size: 52, color: AppColors.accent),
+          decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.08),
+              shape: BoxShape.circle),
+          child: const Icon(Icons.receipt_long_outlined,
+              size: 52, color: AppColors.accent),
         ),
         const SizedBox(height: AppSpacing.lg),
-        Text(AppLocalizations.of(context).noDeliveredOrders, style: texts.headlineSmall),
+        Text(AppLocalizations.of(context).noDeliveredOrders,
+            style: texts.headlineSmall),
         const SizedBox(height: AppSpacing.xs),
-        Text(AppLocalizations.of(context).deliveredOrdersHint, style: texts.bodyMedium),
+        Text(AppLocalizations.of(context).deliveredOrdersHint,
+            style: texts.bodyMedium),
       ]),
     ).animate().fadeIn(duration: 350.ms).slideY(begin: 0.05, end: 0);
   }
@@ -1213,13 +1372,17 @@ class _HisEmptyCancelled extends StatelessWidget {
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
           padding: const EdgeInsets.all(AppSpacing.lg),
-          decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.08), shape: BoxShape.circle),
-          child: const Icon(Icons.check_circle_outline_rounded, size: 52, color: AppColors.success),
+          decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.08),
+              shape: BoxShape.circle),
+          child: const Icon(Icons.check_circle_outline_rounded,
+              size: 52, color: AppColors.success),
         ),
         const SizedBox(height: AppSpacing.lg),
         Text('Aucune commande échouée', style: texts.headlineSmall),
         const SizedBox(height: AppSpacing.xs),
-        Text('Super ! Tous vos paiements ont réussi.', textAlign: TextAlign.center, style: texts.bodyMedium),
+        Text('Super ! Tous vos paiements ont réussi.',
+            textAlign: TextAlign.center, style: texts.bodyMedium),
       ]),
     ).animate().fadeIn(duration: 350.ms).slideY(begin: 0.05, end: 0);
   }
@@ -1248,8 +1411,8 @@ class _HisReceiptActionsState extends State<_HisReceiptActions> {
           content: const Text('Erreur lors de la génération du document'),
           backgroundColor: Colors.red.shade600,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ));
       }
     } finally {
@@ -1262,8 +1425,7 @@ class _HisReceiptActionsState extends State<_HisReceiptActions> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Documents',
-              style:
-                  TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
           const SizedBox(height: 8),
           Row(children: [
             Expanded(
@@ -1321,7 +1483,9 @@ class _HisActionBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: brightness == Brightness.dark ? AppColors.backgroundDark : AppColors.backgroundLight,
+          color: brightness == Brightness.dark
+              ? AppColors.backgroundDark
+              : AppColors.backgroundLight,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -1329,8 +1493,12 @@ class _HisActionBtn extends StatelessWidget {
               ? Container(
                   width: 18,
                   height: 18,
-                  decoration: BoxDecoration(color: texts.bodySmall?.color, shape: BoxShape.circle),
-                ).animate(onPlay: (c) => c.repeat(reverse: true)).fadeIn(duration: 500.ms).scaleXY(end: 0.7)
+                  decoration: BoxDecoration(
+                      color: texts.bodySmall?.color, shape: BoxShape.circle),
+                )
+                  .animate(onPlay: (c) => c.repeat(reverse: true))
+                  .fadeIn(duration: 500.ms)
+                  .scaleXY(end: 0.7)
               : Icon(icon, color: texts.bodySmall?.color, size: 20),
           const SizedBox(height: 4),
           Text(label, style: texts.labelMedium),
@@ -1374,9 +1542,12 @@ class _HisReviewButtonState extends State<_HisReviewButton> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: brightness == Brightness.dark ? AppColors.surfaceDark : AppColors.surfaceLight,
+      backgroundColor: brightness == Brightness.dark
+          ? AppColors.surfaceDark
+          : AppColors.surfaceLight,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.card))),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.card))),
       builder: (_) => _HisReviewSheet(
         restaurantId: widget.restaurantId,
         restaurantName: widget.restaurantName,
@@ -1395,11 +1566,14 @@ class _HisReviewButtonState extends State<_HisReviewButton> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: brightness == Brightness.dark ? AppColors.backgroundDark : AppColors.backgroundLight,
+          color: brightness == Brightness.dark
+              ? AppColors.backgroundDark
+              : AppColors.backgroundLight,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(Icons.check_circle_outline_rounded, color: texts.bodySmall?.color, size: 16),
+          Icon(Icons.check_circle_outline_rounded,
+              color: texts.bodySmall?.color, size: 16),
           const SizedBox(width: 8),
           Text('Avis déjà soumis — merci !', style: texts.bodyMedium),
         ]),
@@ -1447,10 +1621,8 @@ class _HisReviewSheetState extends State<_HisReviewSheet> {
     if (uid == null) return;
     setState(() => _saving = true);
     try {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
+      final userDoc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
       final name = userDoc.data()?['name'] as String? ?? 'Client';
       await ReviewService.addReview(
         widget.restaurantId,
@@ -1470,7 +1642,8 @@ class _HisReviewSheetState extends State<_HisReviewSheet> {
         content: const Text('Merci pour votre avis !'),
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.button)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.button)),
       ));
     } catch (_) {
       if (mounted) setState(() => _saving = false);
@@ -1494,12 +1667,15 @@ class _HisReviewSheetState extends State<_HisReviewSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-                color: brightness == Brightness.dark ? AppColors.dividerDark : AppColors.dividerLight,
+                color: brightness == Brightness.dark
+                    ? AppColors.dividerDark
+                    : AppColors.dividerLight,
                 borderRadius: BorderRadius.circular(2)),
           ),
         ),
         const SizedBox(height: 12),
-        Text('Évaluer ${widget.restaurantName}', style: texts.headlineSmall, textAlign: TextAlign.center),
+        Text('Évaluer ${widget.restaurantName}',
+            style: texts.headlineSmall, textAlign: TextAlign.center),
         const SizedBox(height: 20),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1513,8 +1689,10 @@ class _HisReviewSheetState extends State<_HisReviewSheet> {
               },
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Icon(filled ? Icons.star_rounded : Icons.star_border_rounded,
-                        color: const Color(0xFFFFB020), size: 36)
+                child: Icon(
+                        filled ? Icons.star_rounded : Icons.star_border_rounded,
+                        color: const Color(0xFFFFB020),
+                        size: 36)
                     .animate(target: filled ? 1 : 0)
                     .scaleXY(end: 1.15, duration: 120.ms)
                     .then()
@@ -1534,14 +1712,16 @@ class _HisReviewSheetState extends State<_HisReviewSheet> {
                       : _rating >= 2
                           ? 'Moyen'
                           : 'Décevant',
-          style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+              color: AppColors.accent, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 20),
         TextField(
           controller: _ctrl,
           maxLines: 3,
           style: texts.bodyMedium,
-          decoration: const InputDecoration(hintText: 'Partagez votre expérience (optionnel)'),
+          decoration: const InputDecoration(
+              hintText: 'Partagez votre expérience (optionnel)'),
         ),
         const SizedBox(height: 20),
         PremiumButton(
@@ -1565,7 +1745,9 @@ class _DetailRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 3),
         child:
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(label, style: AppTextStyles.textTheme(Theme.of(context).brightness).labelSmall),
+          Text(label,
+              style: AppTextStyles.textTheme(Theme.of(context).brightness)
+                  .labelSmall),
           Flexible(
             child: Text(value,
                 textAlign: TextAlign.right,
@@ -1589,13 +1771,17 @@ class _EmptyCart extends StatelessWidget {
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
           padding: const EdgeInsets.all(28),
-          decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), shape: BoxShape.circle),
-          child: const Icon(Icons.shopping_cart_outlined, size: 64, color: AppColors.accent),
+          decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.08),
+              shape: BoxShape.circle),
+          child: const Icon(Icons.shopping_cart_outlined,
+              size: 64, color: AppColors.accent),
         ),
         const SizedBox(height: AppSpacing.lg),
         Text('Votre panier est vide', style: texts.headlineSmall),
         const SizedBox(height: AppSpacing.xs),
-        Text('Ajoutez des plats depuis les restaurants', style: texts.bodyMedium),
+        Text('Ajoutez des plats depuis les restaurants',
+            style: texts.bodyMedium),
       ]),
     ).animate().fadeIn(duration: 350.ms).slideY(begin: 0.05, end: 0);
   }
@@ -1616,11 +1802,13 @@ class _CartItemCard extends StatelessWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-        decoration: BoxDecoration(color: AppColors.error, borderRadius: AppRadius.cardRadius),
+        decoration: BoxDecoration(
+            color: AppColors.error, borderRadius: AppRadius.cardRadius),
         child: const Column(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.delete_outline, color: Colors.white, size: 28),
           SizedBox(height: 4),
-          Text('Supprimer', style: TextStyle(color: Colors.white, fontSize: 12)),
+          Text('Supprimer',
+              style: TextStyle(color: Colors.white, fontSize: 12)),
         ]),
       ),
       onDismissed: (_) => cart.removeItem(index),
@@ -1645,30 +1833,43 @@ class _CartItemCard extends StatelessWidget {
                         width: 70,
                         height: 70,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => SkeletonLoader.image(width: 70, height: 70, radius: BorderRadius.zero),
+                        placeholder: (_, __) => SkeletonLoader.image(
+                            width: 70, height: 70, radius: BorderRadius.zero),
                         errorWidget: (_, __, ___) => _platFallback(),
                       )
-                    : Image.asset(item.img, width: 70, height: 70, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _platFallback()),
+                    : Image.asset(item.img,
+                        width: 70,
+                        height: 70,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _platFallback()),
               ),
               const SizedBox(width: 12),
               Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(item.name, style: texts.titleMedium, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 2),
-                Text(item.restaurantName, style: texts.bodySmall, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 6),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(item.price, style: AppTextStyles.priceAccent(size: 14)),
-                ),
-              ])),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(item.name,
+                        style: texts.titleMedium,
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text(item.restaurantName,
+                        style: texts.bodySmall,
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 6),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(item.price,
+                          style: AppTextStyles.priceAccent(size: 14)),
+                    ),
+                  ])),
               Column(children: [
                 _QtyBtn(Icons.add_rounded, () => cart.increaseQuantity(index)),
                 const SizedBox(height: 4),
                 Text('${item.quantity}', style: texts.titleLarge),
                 const SizedBox(height: 4),
-                _QtyBtn(Icons.remove_rounded, () => cart.decreaseQuantity(index)),
+                _QtyBtn(
+                    Icons.remove_rounded, () => cart.decreaseQuantity(index)),
               ]),
             ]),
           ),
@@ -1695,7 +1896,8 @@ class _QtyBtn extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-              border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+              border:
+                  Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
               borderRadius: BorderRadius.circular(20)),
           child: Icon(icon, size: 16, color: AppColors.accent),
         ),
@@ -1891,49 +2093,53 @@ class _SummaryState extends State<_Summary> {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
         boxShadow: AppShadows.medium(brightness),
       ),
       child: SingleChildScrollView(
         physics: const ClampingScrollPhysics(),
         child: Column(children: [
-        Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-                borderRadius: BorderRadius.circular(2))),
-
-        _Row('Sous-total plats', '${widget.cart.totalPrice} FCFA'),
-        const SizedBox(height: 8),
-        _Row('Frais de service (5%)', '$_serviceFee FCFA'),
-
-        const Divider(height: 20),
-        _Row('Total (hors livraison)', '$_total FCFA', bold: true),
-        const SizedBox(height: 4),
-        Text('+ frais de livraison calculés à l\'étape suivante', style: texts.labelSmall),
-        const SizedBox(height: AppSpacing.md),
-        OutlinedButton.icon(
-          onPressed: () => showOrderSheet(context, widget.cart),
-          style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 46)),
-          icon: const Icon(Icons.receipt_long_outlined, size: 18),
-          label: const Text('Récapitulatif de commande'),
-        ),
-        const SizedBox(height: 10),
-        PremiumButton(
-          label: 'Choisir l\'adresse de livraison',
-          icon: Icons.location_on_rounded,
-          height: 54,
-          onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => AdressePage(totalAmount: _total))),
-        ),
-        TextButton(
-          onPressed: () => _confirmClear(context),
-          child: const Text('Vider le panier', style: TextStyle(color: AppColors.error)),
-        ),
-      ]),
+          Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                  color:
+                      isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                  borderRadius: BorderRadius.circular(2))),
+          _Row('Sous-total plats', '${widget.cart.totalPrice} FCFA'),
+          const SizedBox(height: 8),
+          _Row('Frais de service (5%)', '$_serviceFee FCFA'),
+          const Divider(height: 20),
+          _Row('Total (hors livraison)', '$_total FCFA', bold: true),
+          const SizedBox(height: 4),
+          Text('+ frais de livraison calculés à l\'étape suivante',
+              style: texts.labelSmall),
+          const SizedBox(height: AppSpacing.md),
+          OutlinedButton.icon(
+            onPressed: () => showOrderSheet(context, widget.cart),
+            style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 46)),
+            icon: const Icon(Icons.receipt_long_outlined, size: 18),
+            label: const Text('Récapitulatif de commande'),
+          ),
+          const SizedBox(height: 10),
+          PremiumButton(
+            label: 'Choisir l\'adresse de livraison',
+            icon: Icons.location_on_rounded,
+            height: 54,
+            onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => AdressePage(totalAmount: _total))),
+          ),
+          TextButton(
+            onPressed: () => _confirmClear(context),
+            child: const Text('Vider le panier',
+                style: TextStyle(color: AppColors.error)),
+          ),
+        ]),
       ),
     );
   }

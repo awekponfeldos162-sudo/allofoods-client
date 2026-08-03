@@ -92,6 +92,11 @@ test/
 test/
 functions/test/
 
+# Symboles de débogage --obfuscate — nécessaires pour désymboliser les crashs
+# Crashlytics/Play Console, mais ne doivent jamais être publiés (ce sont les
+# clés qui permettent de "dé-obfusquer" votre code)
+debug-info/
+
 certificate/
 firestore.rules
 screenshots/
