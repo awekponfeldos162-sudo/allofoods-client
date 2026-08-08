@@ -88,9 +88,6 @@ lib.zip
 # Empreintes keystore Android (données personnelles)
 enpreinte
 enpreinte.*
-test/
-test/
-functions/test/
 
 # Symboles de débogage --obfuscate — nécessaires pour désymboliser les crashs
 # Crashlytics/Play Console, mais ne doivent jamais être publiés (ce sont les

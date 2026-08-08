@@ -210,6 +210,7 @@ function _maskPhone(phone) {
   if (s.length <= 2) return "**";
   return `${"*".repeat(s.length - 2)}${s.slice(-2)}`;
 }
+exports._maskPhone = _maskPhone; // exporté pour test/unit/maskPhone.test.js
 
 // ── GET helper FedaPay (sans body) ────────────────────────────────
 function _fedaPayGet(path) {

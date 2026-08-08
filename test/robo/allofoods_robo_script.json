@@ -1,0 +1,308 @@
+[
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 4000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Ne pas autoriser" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 500
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Connexion" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 500
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_TEXT_CHANGED",
+    "replacementText": "test.load@allofoods.bj",
+    "elementDescriptors": [{ "text": "Email", "className": "android.widget.EditText" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_TEXT_CHANGED",
+    "replacementText": "AlloFoods@Load2026!",
+    "elementDescriptors": [{ "text": "Mot de passe", "className": "android.widget.EditText" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Se connecter" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 5000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "SCROLL_DOWN"
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "SCROLL_DOWN"
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Rapide" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Tous" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "SCROLL_UP"
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Panier" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 2000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Favoris" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Historique" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Panier" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Profil" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 2000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Mes commandes" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 2000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "BACK_PRESS"
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 800
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Notifications" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1500
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "BACK_PRESS"
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 500
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Paramètres" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1500
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "BACK_PRESS"
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 500
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Accueil" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 2000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "SCROLL_DOWN"
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "SCROLL_DOWN"
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Panier" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 2000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "SCROLL_DOWN"
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_CLICKED",
+    "elementDescriptors": [{ "text": "Commander" }]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 3000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_TEXT_CHANGED",
+    "replacementText": "0196000001",
+    "elementDescriptors": [
+      { "text": "Numéro Mobile Money", "className": "android.widget.EditText" }
+    ]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_TEXT_CHANGED",
+    "replacementText": "0194000001",
+    "elementDescriptors": [
+      { "text": "Numéro Mobile Money", "className": "android.widget.EditText" }
+    ]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "VIEW_TEXT_CHANGED",
+    "replacementText": "0196000001",
+    "elementDescriptors": [
+      { "text": "Numéro Mobile Money", "className": "android.widget.EditText" }
+    ]
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 1000
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "BACK_PRESS"
+  },
+  {
+    "crawlStage": "crawl",
+    "eventType": "DELAYED",
+    "delayTime": 2000
+  }
+]
